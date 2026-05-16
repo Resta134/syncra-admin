@@ -22,7 +22,7 @@ export default function SettingsPage() {
         <div className="flex justify-between items-end">
           <div>
             <h2 className="text-3xl font-bold text-glow text-cyan-400 uppercase tracking-tight">System Settings</h2>
-            <p className="text-gray-400 text-sm font-medium">Configure SYNCRA AI engine and administrative controls.</p>
+            <p className="text-gray-400 text-sm font-medium">Configure SYNCRO AI engine and administrative controls.</p>
           </div>
           <button className="flex items-center gap-2 bg-cyan-500 hover:bg-cyan-400 text-black px-6 py-2.5 rounded-xl font-bold transition-all shadow-[0_0_20px_rgba(6,182,212,0.3)] cursor-pointer">
             <Save size={18} />
@@ -63,7 +63,7 @@ export default function SettingsPage() {
                     <label className="text-[10px] text-gray-500 uppercase font-black tracking-widest">AI API Endpoint</label>
                     <input 
                       type="text" 
-                      defaultValue="https://api.syncra.ai/v1/vision"
+                      defaultValue="https://api.syncro.ai/v1/vision"
                       className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-sm focus:outline-none focus:border-cyan-500/50 text-white"
                     />
                   </div>
