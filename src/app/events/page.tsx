@@ -14,20 +14,27 @@ import {
   Infinity,
   Clock,
   Loader2,
+  Ticket,
+  Mic, // <-- Tambahan icon Mic untuk pemateri
 } from "lucide-react";
 import { useState, useMemo, useEffect } from "react";
-import { supabase } from "@/lib/supabase"; // Import helper supabase
+import { supabase } from "@/lib/supabase"; 
 
+// --- 1. UPDATE INTERFACE (Tambahan Speaker) ---
 interface EventData {
-  id: string; // Diubah ke string karena UUID Supabase
+  id: string;
   title: string;
   status: "Upcoming" | "Ongoing" | "Completed";
-  event_date: string; // Sesuai kolom DB
-  event_time: string; // Sesuai kolom DB
+  event_date: string;
+  event_time: string;
   location: string;
   quota: number | "Unlimited";
-  image_url: string; // Sesuai kolom DB
-  description: string; // TAMBAHAN FIELD
+  price: number;
+  image_url: string;
+  description: string;
+  speaker_1: string; // Wajib
+  speaker_2?: string | null; // Opsional
+  speaker_3?: string | null; // Opsional
   participants?: number;
 }
 
@@ -38,6 +45,8 @@ export default function EventsPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<EventData | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
+  
+  // --- 2. UPDATE DEFAULT STATE (Tambahan Speaker) ---
   const [formData, setFormData] = useState<Partial<EventData>>({
     title: "",
     status: "Upcoming",
@@ -45,11 +54,14 @@ export default function EventsPage() {
     event_time: "",
     location: "",
     quota: 0,
+    price: 0,
     image_url: "",
     description: "",
+    speaker_1: "",
+    speaker_2: "",
+    speaker_3: "",
   });
 
-  // 1. FUNGSI AMBIL DATA (READ)
   const fetchEvents = async () => {
     setLoading(true);
     const { data, error } = await supabase
@@ -70,24 +82,19 @@ export default function EventsPage() {
     fetchEvents();
   }, []);
 
-  // 2. FUNGSI SIMPAN (CREATE & UPDATE)
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true); // Pastikan kamu punya state loading untuk UX yang lebih baik
+    setLoading(true); 
 
     try {
       let finalImageUrl = formData.image_url;
 
-      // 1. LOGIKA UPLOAD KE SUPABASE STORAGE
-      // Kita hanya upload jika ada file baru yang dipilih (imageFile tidak null)
       if (imageFile) {
-        // Buat nama file unik agar tidak bentrok di storage
         const fileExt = imageFile.name.split(".").pop();
         // eslint-disable-next-line react-hooks/purity
         const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
         const filePath = `${fileName}`;
 
-        // Proses Upload ke Bucket 'event-images'
         const { error: uploadError } = await supabase.storage
           .from("event-images")
           .upload(filePath, imageFile);
@@ -96,7 +103,6 @@ export default function EventsPage() {
           throw new Error("Gagal upload gambar: " + uploadError.message);
         }
 
-        // Ambil Public URL-nya untuk disimpan ke Database
         const { data: urlData } = supabase.storage
           .from("event-images")
           .getPublicUrl(filePath);
@@ -104,22 +110,24 @@ export default function EventsPage() {
         finalImageUrl = urlData.publicUrl;
       }
 
-      // 2. MENYIAPKAN DATA (PAYLOAD) UNTUK DATABASE
+      // --- 3. UPDATE PAYLOAD UNTUK SUPABASE ---
       const payload = {
         title: formData.title,
         description: formData.description,
         event_date: formData.event_date,
         event_time: formData.event_time,
         location: formData.location,
-        // Jika Unlimited, kita set angka besar agar tidak membatasi sistem
         quota: formData.quota === "Unlimited" ? 999999 : formData.quota,
+        price: Number(formData.price),
         status: formData.status,
         image_url: finalImageUrl,
+        // Masukkan data speaker, jika string kosong ubah menjadi null
+        speaker_1: formData.speaker_1,
+        speaker_2: formData.speaker_2?.trim() === "" ? null : formData.speaker_2,
+        speaker_3: formData.speaker_3?.trim() === "" ? null : formData.speaker_3,
       };
 
-      // 3. EKSEKUSI KE DATABASE (CREATE ATAU UPDATE)
       if (editingEvent) {
-        // Jika sedang dalam mode Edit (Update)
         const { error: updateError } = await supabase
           .from("events")
           .update(payload)
@@ -127,7 +135,6 @@ export default function EventsPage() {
 
         if (updateError) throw updateError;
       } else {
-        // Jika sedang membuat event baru (Insert)
         const { error: insertError } = await supabase
           .from("events")
           .insert([payload]);
@@ -135,19 +142,11 @@ export default function EventsPage() {
         if (insertError) throw insertError;
       }
 
-      // 4. FINALISASI (REFRESH DATA & TUTUP MODAL)
       alert("System Synchronized Successfully!");
-
-      // Reset state file agar tidak terupload ulang di event berikutnya
       setImageFile(null);
-
-      // Panggil fungsi fetch data agar tabel/card otomatis terupdate
       fetchEvents();
-
-      // Tutup modal form
       closeModal();
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
       console.error("Submit Error:", error);
       alert("Proses Gagal: " + error.message);
@@ -156,7 +155,6 @@ export default function EventsPage() {
     }
   };
 
-  // 3. FUNGSI HAPUS (DELETE)
   const handleDelete = async (id: string) => {
     if (confirm("Hapus event ini?")) {
       const { error } = await supabase.from("events").delete().eq("id", id);
@@ -174,7 +172,12 @@ export default function EventsPage() {
   const openModal = (event?: EventData) => {
     if (event) {
       setEditingEvent(event);
-      setFormData(event);
+      setFormData({
+        ...event,
+        // Pastikan null dari database dikonversi ke string kosong untuk input form
+        speaker_2: event.speaker_2 || "",
+        speaker_3: event.speaker_3 || "",
+      });
     } else {
       setEditingEvent(null);
       setFormData({
@@ -184,8 +187,12 @@ export default function EventsPage() {
         event_time: "",
         location: "",
         quota: 0,
+        price: 0,
         image_url: "",
         description: "",
+        speaker_1: "",
+        speaker_2: "",
+        speaker_3: "",
       });
     }
     setIsModalOpen(true);
@@ -285,10 +292,10 @@ export default function EventsPage() {
                 </div>
 
                 <div className="p-6 space-y-4">
-                  <h3 className="text-xl font-bold text-white group-hover:text-cyan-400 transition-colors leading-tight italic">
+                  <h3 className="text-xl font-bold text-white group-hover:text-cyan-400 transition-colors leading-tight italic line-clamp-2">
                     {event.title}
                   </h3>
-                  <div className="grid grid-cols-1 gap-2 text-xs text-gray-400 font-bold uppercase tracking-tighter">
+                  <div className="grid grid-cols-1 gap-2 text-[11px] text-gray-400 font-bold uppercase tracking-widest">
                     <div className="flex items-center gap-2">
                       <CalIcon size={14} className="text-cyan-500" />{" "}
                       {event.event_date} |{" "}
@@ -296,12 +303,49 @@ export default function EventsPage() {
                       {event.event_time}
                     </div>
                     <div className="flex items-center gap-2">
-                      <MapPin size={14} className="text-cyan-500" />{" "}
-                      {event.location}
+                      <MapPin size={14} className="text-cyan-500 shrink-0" />{" "}
+                      <span className="truncate">{event.location}</span>
+                    </div>
+                    {/* INDIKATOR PEMATERI DI KARTU (Opsional, tapi bagus untuk UX) */}
+                    <div className="flex items-center gap-2">
+                      <Mic size={14} className="text-cyan-500 shrink-0" />{" "}
+                      <span className="truncate text-white">
+                        {event.speaker_1} {event.speaker_2 ? `& lainnya` : ''}
+                      </span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Users size={14} className="text-cyan-500" /> Kuota:{" "}
-                      {event.quota === 999999 ? "Unlimited" : event.quota}
+                      <Users size={14} className="text-cyan-500 shrink-0" />{" "}
+                      Kuota:{" "}
+                      <span className="text-white">
+                        {event.quota === 999999 ? "Unlimited" : event.quota}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Ticket
+                        size={14}
+                        className={
+                          event.price === 0 || !event.price
+                            ? "text-emerald-500"
+                            : "text-yellow-500"
+                        }
+                        shrink-0
+                      />
+                      Harga:{" "}
+                      <span
+                        className={
+                          event.price === 0 || !event.price
+                            ? "text-emerald-400"
+                            : "text-yellow-400"
+                        }
+                      >
+                        {event.price === 0 || !event.price
+                          ? "GRATIS"
+                          : new Intl.NumberFormat("id-ID", {
+                              style: "currency",
+                              currency: "IDR",
+                              minimumFractionDigits: 0,
+                            }).format(event.price)}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -311,10 +355,9 @@ export default function EventsPage() {
         )}
       </div>
 
-      {/* Modal Form Diperbaiki - Lebih Scannable & Tidak Numpuk */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-md p-4">
-          <div className="glass-card w-full max-w-xl p-8 border-cyan-500/20 relative max-h-[90vh] overflow-y-auto custom-scrollbar">
+          <div className="glass-card w-full max-w-2xl p-8 border-cyan-500/20 relative max-h-[90vh] overflow-y-auto custom-scrollbar bg-[#0a0a0a]">
             <button
               onClick={closeModal}
               className="absolute top-6 right-6 text-gray-500 hover:text-white cursor-pointer z-10"
@@ -327,7 +370,6 @@ export default function EventsPage() {
             </h3>
 
             <form onSubmit={handleSubmit} className="space-y-6">
-              {/* Row 1: Nama Event */}
               <div className="space-y-2">
                 <label className="text-[10px] text-gray-500 font-black uppercase tracking-[0.2em]">
                   Nama Event
@@ -343,7 +385,6 @@ export default function EventsPage() {
                 />
               </div>
 
-              {/* Row 2: Deskripsi */}
               <div className="space-y-2">
                 <label className="text-[10px] text-gray-500 font-black uppercase tracking-[0.2em]">
                   Deskripsi Singkat
@@ -359,7 +400,43 @@ export default function EventsPage() {
                 />
               </div>
 
-              {/* Row 3: Grid Tanggal & Jam */}
+              {/* --- 4. FORM INPUT PEMATERI (1 Wajib, 2 Opsional) --- */}
+              <div className="space-y-4 bg-white/[0.02] border border-white/5 p-5 rounded-2xl">
+                <label className="flex items-center gap-2 text-[10px] text-cyan-500 font-black uppercase tracking-[0.2em]">
+                  <Mic size={14} /> Daftar Pemateri
+                </label>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-[9px] text-gray-500 uppercase font-bold">Pemateri 1 (Wajib)</label>
+                    <input
+                      required
+                      value={formData.speaker_1}
+                      onChange={(e) => setFormData({ ...formData, speaker_1: e.target.value })}
+                      className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-sm text-white outline-none focus:border-cyan-500 transition-all"
+                      placeholder="Nama Lengkap"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[9px] text-gray-500 uppercase font-bold">Pemateri 2 (Opsional)</label>
+                    <input
+                      value={formData.speaker_2 || ""}
+                      onChange={(e) => setFormData({ ...formData, speaker_2: e.target.value })}
+                      className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-sm text-white outline-none focus:border-cyan-500 transition-all"
+                      placeholder="Nama Lengkap"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[9px] text-gray-500 uppercase font-bold">Pemateri 3 (Opsional)</label>
+                    <input
+                      value={formData.speaker_3 || ""}
+                      onChange={(e) => setFormData({ ...formData, speaker_3: e.target.value })}
+                      className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-sm text-white outline-none focus:border-cyan-500 transition-all"
+                      placeholder="Nama Lengkap"
+                    />
+                  </div>
+                </div>
+              </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <label className="text-[10px] text-gray-500 font-black uppercase tracking-[0.2em]">
@@ -391,7 +468,6 @@ export default function EventsPage() {
                 </div>
               </div>
 
-              {/* Row 4: Lokasi */}
               <div className="space-y-2">
                 <label className="text-[10px] text-gray-500 font-black uppercase tracking-[0.2em]">
                   Lokasi / Venue
@@ -413,42 +489,64 @@ export default function EventsPage() {
                 </div>
               </div>
 
-              {/* Row 5: Kuota & Status */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-[10px] text-gray-500 font-black uppercase tracking-[0.2em]">
-                    Batasan Kuota
-                  </label>
-                  <div className="flex gap-2">
-                    <input
-                      disabled={formData.quota === "Unlimited"}
-                      type="number"
-                      value={
-                        formData.quota === "Unlimited" ? "" : formData.quota
-                      }
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          quota: parseInt(e.target.value),
-                        })
-                      }
-                      className="flex-1 bg-white/5 border border-white/10 rounded-xl p-4 text-sm text-white outline-none focus:border-cyan-500"
-                      placeholder="0"
-                    />
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setFormData({
-                          ...formData,
-                          quota:
-                            formData.quota === "Unlimited" ? 0 : "Unlimited",
-                        })
-                      }
-                      className={`px-3 rounded-xl border text-[8px] font-black transition-all ${formData.quota === "Unlimited" ? "bg-cyan-500 text-black border-cyan-500 shadow-[0_0_15px_rgba(6,182,212,0.4)]" : "border-white/10 text-gray-500"}`}
-                    >
-                      UNLIMITED
-                    </button>
-                  </div>
+              <div className="space-y-2">
+                <label className="text-[10px] text-gray-500 font-black uppercase tracking-[0.2em]">
+                  Batasan Kuota
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    disabled={formData.quota === "Unlimited"}
+                    type="number"
+                    value={formData.quota === "Unlimited" ? "" : formData.quota}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        quota: parseInt(e.target.value) || 0,
+                      })
+                    }
+                    className="flex-1 bg-white/5 border border-white/10 rounded-xl p-4 text-sm text-white outline-none focus:border-cyan-500"
+                    placeholder="0"
+                  />
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setFormData({
+                        ...formData,
+                        quota: formData.quota === "Unlimited" ? 0 : "Unlimited",
+                      })
+                    }
+                    className={`px-3 rounded-xl border text-[8px] font-black transition-all ${
+                      formData.quota === "Unlimited"
+                        ? "bg-cyan-500 text-black border-cyan-500 shadow-[0_0_15px_rgba(6,182,212,0.4)]"
+                        : "border-white/10 text-gray-500"
+                    }`}
+                  >
+                    UNLIMITED
+                  </button>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[10px] text-gray-500 font-black uppercase tracking-[0.2em]">
+                  Harga Tiket (Rp)
+                </label>
+                <div className="flex gap-2 items-center relative">
+                  <span className="absolute left-4 text-gray-500 font-bold text-sm">
+                    Rp
+                  </span>
+                  <input
+                    type="number"
+                    min="0"
+                    value={formData.price === 0 ? "" : formData.price}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        price: parseInt(e.target.value) || 0,
+                      })
+                    }
+                    className="w-full bg-white/5 border border-white/10 rounded-xl py-4 pl-12 pr-4 text-sm text-white outline-none focus:border-cyan-500"
+                    placeholder="0 (Gratis)"
+                  />
                 </div>
               </div>
 
@@ -473,7 +571,6 @@ export default function EventsPage() {
                 </select>
               </div>
 
-              {/* Row 6: Upload Foto (Kembali Muncul) */}
               <div className="space-y-2">
                 <label className="text-[10px] text-gray-500 font-black uppercase tracking-[0.2em]">
                   Foto Pamflet / Banner
@@ -489,7 +586,7 @@ export default function EventsPage() {
                         onClick={() =>
                           setFormData({ ...formData, image_url: "" })
                         }
-                        className="absolute -top-2 -right-2 bg-red-500 p-1 rounded-full"
+                        className="absolute -top-2 -right-2 bg-red-500 p-1 rounded-full z-10"
                       >
                         <X size={12} />
                       </button>
@@ -509,8 +606,7 @@ export default function EventsPage() {
                     onChange={(e) => {
                       const file = e.target.files?.[0];
                       if (file) {
-                        setImageFile(file); // Simpan file ke state
-                        // Opsi: Buat preview sementara agar user tahu gambar sudah terpilih
+                        setImageFile(file); 
                         setFormData({
                           ...formData,
                           image_url: URL.createObjectURL(file),
@@ -523,7 +619,7 @@ export default function EventsPage() {
 
               <button
                 type="submit"
-                className="w-full bg-cyan-500 hover:bg-cyan-400 text-black font-black py-5 rounded-2xl mt-4 shadow-[0_0_30px_rgba(6,182,212,0.3)] transition-all uppercase tracking-[0.3em] text-xs"
+                className="w-full bg-cyan-500 hover:bg-cyan-400 text-black font-black py-5 rounded-2xl mt-4 shadow-[0_0_30px_rgba(6,182,212,0.3)] transition-all uppercase tracking-[0.3em] text-xs cursor-pointer"
               >
                 {editingEvent ? "Confirm Update System" : "Deploy To System"}
               </button>

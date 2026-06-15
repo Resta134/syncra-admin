@@ -22,7 +22,7 @@ export default function DebugPage() {
   return (
     <div className="p-12 bg-[#020205] min-h-screen text-white font-sans">
       <div className="max-w-2xl mx-auto border border-white/10 p-8 rounded-2xl bg-white/5">
-        <h1 className="text-2xl font-bold mb-4 italic text-purple-500">Syncra Database Debugger</h1>
+        <h1 className="text-2xl font-bold mb-4 italic text-purple-500">Syncro Database Debugger</h1>
         <p className="text-gray-400 text-sm mb-8 font-bold uppercase tracking-widest">
           Status Koneksi: {status?.success ? "✅ TERKONEKSI" : "❌ BELUM TERHUBUNG"}
         </p>

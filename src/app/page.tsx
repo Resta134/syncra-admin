@@ -475,11 +475,11 @@ export default function SyncroLandingPage() {
               />
               <ContactItem
                 icon={<Mail size={18} />}
-                text="hello@syncroai.com"
+                text="syncro.ai2026@gmail.com"
               />
               <ContactItem
                 icon={<MapPin size={18} />}
-                text="Jakarta, Indonesia"
+                text="Tegal, Jawa Tengah, Indonesia"
               />
             </div>
           </div>

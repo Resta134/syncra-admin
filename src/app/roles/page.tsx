@@ -9,52 +9,65 @@ import {
   Search,
   Trash2,
   Edit,
+  Loader2,
 } from "lucide-react";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { supabase } from "@/lib/supabase";
 
 interface UserAccount {
-  id: number;
+  id: string;
   name: string;
   email: string;
-  role: "Moderator" | "Speaker" | "Gatekeeper";
-  status: "Active" | "Inactive";
+  role: string;
+  status: string;
 }
 
 export default function RolesPage() {
-  const [users, setUsers] = useState<UserAccount[]>([
-    {
-      id: 1,
-      name: "Rhiki Sulistiyo",
-      email: "rhiki@syncra.ai",
-      role: "Gatekeeper",
-      status: "Active",
-    },
-    {
-      id: 2,
-      name: "Ahmat Fauzi",
-      email: "fauzi@syncra.ai",
-      role: "Speaker",
-      status: "Active",
-    },
-    {
-      id: 3,
-      name: "M. Iqbal Saputra",
-      email: "iqbal@syncra.ai",
-      role: "Moderator",
-      status: "Active",
-    },
-  ]);
-
+  const [users, setUsers] = useState<UserAccount[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingId, setEditingId] = useState<number | null>(null); // State untuk melacak user yang sedang diedit
+  const [editingId, setEditingId] = useState<string | null>(null);
 
-  const [formData, setFormData] = useState<Omit<UserAccount, "id">>({
+  // Form data sekarang mencakup Password untuk pembuatan akun kru baru oleh Admin
+  const [formData, setFormData] = useState({
     name: "",
     email: "",
+    password: "",
     role: "Gatekeeper",
     status: "Active",
   });
+
+  const fetchUsersFromSupabase = async () => {
+    try {
+      setLoading(true);
+      // Mengambil seluruh data profil kru dari tabel
+      const { data, error } = await supabase.from("profiles").select("*");
+      if (error) throw error;
+
+      if (data) {
+        setUsers(
+          data.map((u) => ({
+            id: u.id,
+            name: u.full_name || "No Name",
+            email: u.email || "No Email",
+            role: u.package_tier || "Gatekeeper",
+            status: "Active",
+          })),
+        );
+      }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } catch (error: any) {
+      console.error("Gagal sinkronisasi RLS: ", error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchUsersFromSupabase();
+  }, []);
 
   const filteredUsers = useMemo(() => {
     return users.filter((u) =>
@@ -62,39 +75,121 @@ export default function RolesPage() {
     );
   }, [searchQuery, users]);
 
-  // FUNGSI: Buka Modal untuk Edit
   const handleEditClick = (user: UserAccount) => {
     setEditingId(user.id);
     setFormData({
       name: user.name,
       email: user.email,
+      password: "", // Kosongkan saat edit
       role: user.role,
       status: user.status,
     });
     setIsModalOpen(true);
   };
 
-  // FUNGSI: Simpan Data (Tambah Baru ATAU Update)
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  // HANDLER: SIMPAN DATA (CREATE VIA API ATAU UPDATE VIA DIRECT)
+  // HANDLER: SIMPAN DATA (CREATE & UPDATE VIA API ROUTE ADMIN)
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    setLoading(true);
 
     if (editingId !== null) {
-      // LOGIKA UPDATE
-      setUsers(
-        users.map((u) =>
-          u.id === editingId ? { ...formData, id: editingId } : u,
-        ),
-      );
+      // ================= PROSES UPDATE DATA KRU VIA API =================
+      try {
+        const response = await fetch("/api/admin/update-user", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            userId: editingId,
+            name: formData.name,
+            role: formData.role,
+          }),
+        });
+
+        const result = await response.json();
+        if (result.success) {
+          alert(
+            "Sukses! Hak akses akun kru berhasil diperbarui secara permanen.",
+          );
+        } else {
+          alert("Gagal memperbarui: " + result.error);
+        }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } catch (error: any) {
+        alert("Terjadi kesalahan jaringan: " + error.message);
+      }
     } else {
-      // LOGIKA TAMBAH BARU
-      const newUser: UserAccount = { ...formData, id: Date.now() };
-      setUsers([...users, newUser]);
+      // PROSES CREATE ACCOUNT KRU BARU
+      const response = await fetch("/api/admin/create-user", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: formData.name,
+          email: formData.email,
+          password: formData.password,
+          role: formData.role,
+        }),
+      });
+
+      const result = await response.json();
+      if (result.success) {
+        alert(
+          `Akun untuk ${formData.name} sebagai ${formData.role} berhasil dibuat!`,
+        );
+      } else {
+        alert("Gagal deploy kru: " + result.error);
+      }
     }
 
-    // Reset dan Tutup
+    // Sinkronisasi ulang data tabel langsung dari Supabase cloud setelah disave
+    await fetchUsersFromSupabase();
+
+    // Reset status form dan tutup modal dialog
     setIsModalOpen(false);
     setEditingId(null);
-    setFormData({ name: "", email: "", role: "Gatekeeper", status: "Active" });
+    setFormData({
+      name: "",
+      email: "",
+      password: "",
+      role: "Gatekeeper",
+      status: "Active",
+    });
+    setLoading(false);
+  };
+
+  const handleDeleteUser = async (id: string) => {
+    if (
+      !confirm(
+        "Apakah Anda yakin ingin mencabut paksa hak akses akun ini dari sistem Syncra AI?",
+      )
+    )
+      return;
+
+    try {
+      setLoading(true);
+      // Panggil API Route internal Next.js yang memegang kunci sakti admin
+      const response = await fetch("/api/admin/delete-user", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: id }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        alert(
+          "Sukses! Akun berhasil dihapus secara permanen dari server cloud.",
+        );
+        await fetchUsersFromSupabase(); // Segarkan isi tabel agar datanya langsung hilang dari layar
+      } else {
+        alert("Gagal menghapus: " + result.error);
+      }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } catch (error: any) {
+      alert("Terjadi kesalahan jaringan: " + error.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -112,10 +207,11 @@ export default function RolesPage() {
           </div>
           <button
             onClick={() => {
-              setEditingId(null); // Pastikan bukan mode edit
+              setEditingId(null);
               setFormData({
                 name: "",
                 email: "",
+                password: "",
                 role: "Gatekeeper",
                 status: "Active",
               });
@@ -176,77 +272,81 @@ export default function RolesPage() {
           />
         </div>
 
-        {/* Tabel */}
-        <div className="glass-card overflow-hidden border-white/5">
-          <table className="w-full text-left">
-            <thead>
-              <tr className="bg-white/5 text-gray-500 text-[10px] uppercase tracking-widest font-bold">
-                <th className="px-6 py-5">User Profile</th>
-                <th className="px-6 py-5">Role Assigned</th>
-                <th className="px-6 py-5">Status</th>
-                <th className="px-6 py-5 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-white/5">
-              {filteredUsers.map((user) => (
-                <tr
-                  key={user.id}
-                  className="hover:bg-white/[0.02] transition-colors group"
-                >
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-white/10 border border-white/20 flex items-center justify-center text-cyan-400 text-sm font-bold">
-                        {user.name.charAt(0)}
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-white">
-                          {user.name}
-                        </p>
-                        <p className="text-[10px] text-gray-500">
-                          {user.email}
-                        </p>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 italic font-bold">
-                    <span className="text-[10px] text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded uppercase">
-                      {user.role}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-xs text-emerald-400 font-mono italic uppercase">
-                    {user.status}
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <div className="flex justify-end gap-3 text-gray-500 group-hover:text-gray-300">
-                      <button
-                        onClick={() => handleEditClick(user)}
-                        className="hover:text-cyan-400 transition-all cursor-pointer"
-                      >
-                        <Edit size={16} />
-                      </button>
-                      <button
-                        onClick={() =>
-                          setUsers(users.filter((u) => u.id !== user.id))
-                        }
-                        className="hover:text-red-500 transition-all cursor-pointer"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
-                  </td>
+        {/* Table Render */}
+        {loading ? (
+          <div className="flex items-center justify-center p-12">
+            <Loader2 className="animate-spin text-cyan-400" size={32} />
+          </div>
+        ) : (
+          <div className="glass-card overflow-hidden border-white/5">
+            <table className="w-full text-left">
+              <thead>
+                <tr className="bg-white/5 text-gray-500 text-[10px] uppercase tracking-widest font-bold">
+                  <th className="px-6 py-5">User Profile</th>
+                  <th className="px-6 py-5">Role Assigned</th>
+                  <th className="px-6 py-5">Status</th>
+                  <th className="px-6 py-5 text-right">Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className="divide-y divide-white/5">
+                {filteredUsers.map((user) => (
+                  <tr
+                    key={user.id}
+                    className="hover:bg-white/[0.02] transition-colors group"
+                  >
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-white/10 border border-white/20 flex items-center justify-center text-cyan-400 text-sm font-bold">
+                          {user.name.charAt(0)}
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-white">
+                            {user.name}
+                          </p>
+                          <p className="text-[10px] text-gray-500">
+                            {user.email}
+                          </p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 font-bold">
+                      <span className="text-[10px] text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded uppercase">
+                        {user.role}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-xs text-emerald-400 font-mono italic uppercase">
+                      {user.status}
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <div className="flex justify-end gap-3 text-gray-500 group-hover:text-gray-300">
+                        <button
+                          onClick={() => handleEditClick(user)}
+                          className="hover:text-cyan-400 cursor-pointer"
+                        >
+                          <Edit size={16} />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteUser(user.id)}
+                          className="hover:text-red-500 cursor-pointer"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
-      {/* Modal - Bisa Tambah & Edit */}
+      {/* MODAL DIALOG */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
           <div className="glass-card w-full max-w-md p-8 border-cyan-500/20 relative">
             <h3 className="text-xl font-bold text-cyan-400 mb-6 uppercase tracking-tight italic">
-              {editingId !== null ? "Update Access" : "Deploy Access"}
+              {editingId !== null ? "Update Access Role" : "Create Account Kru"}
             </h3>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-1">
@@ -269,25 +369,43 @@ export default function RolesPage() {
                 <input
                   required
                   type="email"
+                  readOnly={editingId !== null}
                   value={formData.email}
                   onChange={(e) =>
                     setFormData({ ...formData, email: e.target.value })
                   }
-                  className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-sm text-white outline-none focus:border-cyan-500"
+                  className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-sm text-white outline-none focus:border-cyan-500 disabled:text-gray-500"
                 />
               </div>
+
+              {/* Tampilkan input password HANYA saat membuat akun baru */}
+              {editingId === null && (
+                <div className="space-y-1">
+                  <label className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">
+                    Password Akun Kru
+                  </label>
+                  <input
+                    required
+                    type="password"
+                    value={formData.password}
+                    onChange={(e) =>
+                      setFormData({ ...formData, password: e.target.value })
+                    }
+                    placeholder="Minimal 6 karakter"
+                    className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-sm text-white outline-none focus:border-cyan-500"
+                  />
+                </div>
+              )}
+
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <label className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">
-                    Role
+                    Assign Role
                   </label>
                   <select
                     value={formData.role}
                     onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        role: e.target.value as UserAccount["role"],
-                      })
+                      setFormData({ ...formData, role: e.target.value })
                     }
                     className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl p-3 text-sm text-white outline-none focus:border-cyan-500"
                   >
@@ -296,41 +414,21 @@ export default function RolesPage() {
                     <option value="Moderator">Moderator</option>
                   </select>
                 </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">
-                    Status
-                  </label>
-                  <select
-                    value={formData.status}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        status: e.target.value as UserAccount["status"],
-                      })
-                    }
-                    className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl p-3 text-sm text-white outline-none focus:border-cyan-500"
-                  >
-                    <option value="Active">Active</option>
-                    <option value="Inactive">Inactive</option>
-                  </select>
-                </div>
               </div>
+
               <div className="flex gap-3 mt-6">
                 <button
                   type="button"
-                  onClick={() => {
-                    setIsModalOpen(false);
-                    setEditingId(null);
-                  }}
+                  onClick={() => setIsModalOpen(false)}
                   className="flex-1 py-3 bg-white/5 border border-white/10 rounded-xl text-[10px] font-bold uppercase tracking-widest"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-3 bg-cyan-500 text-black rounded-xl text-[10px] font-bold uppercase tracking-widest shadow-[0_0_15px_rgba(6,182,212,0.3)]"
+                  className="flex-1 py-3 bg-cyan-500 text-black rounded-xl text-[10px] font-bold uppercase tracking-widest shadow-[0_0_15px_rgba(6,182,212,0.3)] cursor-pointer"
                 >
-                  {editingId !== null ? "Update" : "Deploy Access"}
+                  {editingId !== null ? "Save Changes" : "Deploy Account"}
                 </button>
               </div>
             </form>
