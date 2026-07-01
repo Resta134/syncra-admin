@@ -405,9 +405,10 @@ export default function SyncroLandingPage() {
       <section id="download" className="max-w-7xl mx-auto px-6 py-24">
         <div className="rounded-[40px] border border-white/10 bg-gradient-to-br from-[#111827] to-[#0B1022] p-12">
           <div className="grid lg:grid-cols-2 gap-14 items-center">
+            {/* BAGIAN KIRI: Teks & Tombol */}
             <div>
               <p className="text-violet-400 font-semibold mb-3">MOBILE APP</p>
-              <h2 className="text-5xl font-bold leading-tight">
+              <h2 className="text-5xl font-bold leading-tight text-white">
                 Akses Translate Event Dalam Genggaman
               </h2>
               <p className="text-gray-400 mt-6 text-lg leading-relaxed">
@@ -416,41 +417,25 @@ export default function SyncroLandingPage() {
                 aplikasi.
               </p>
               <div className="flex flex-wrap gap-4 mt-10">
-                <button className="px-6 py-4 rounded-2xl bg-white text-black font-semibold flex items-center gap-2">
+                <button className="px-6 py-4 rounded-2xl bg-white text-black font-semibold flex items-center gap-2 hover:bg-gray-200 transition">
                   <Download size={18} /> Google Play
                 </button>
-                <button className="px-6 py-4 rounded-2xl border border-white/10 hover:bg-white/5 transition">
+                <button className="px-6 py-4 rounded-2xl border border-white/10 text-white hover:bg-white/5 transition">
                   App Store
                 </button>
               </div>
             </div>
 
-            {/* PHONE MOCKUP */}
-            <div className="flex justify-center">
-              <div className="w-[280px] h-[560px] rounded-[40px] border-8 border-[#1F2937] bg-[#0F172A] overflow-hidden shadow-2xl">
-                <div className="p-5">
-                  <div className="flex items-center justify-between mb-6">
-                    <div>
-                      <p className="text-sm text-gray-400">AI Future Summit</p>
-                      <h3 className="font-bold mt-1">Main Stage</h3>
-                    </div>
-                    <div className="px-2 py-1 rounded-full bg-red-500/20 text-red-400 text-xs">
-                      LIVE
-                    </div>
-                  </div>
-                  <div className="rounded-2xl bg-gradient-to-br from-violet-500/20 to-blue-500/20 p-5 min-h-[280px]">
-                    <p className="text-gray-200 leading-relaxed">
-                      Artificial Intelligence akan menjadi fondasi utama
-                      industri masa depan dan mengubah cara manusia bekerja...
-                    </p>
-                  </div>
-                  <div className="grid grid-cols-3 gap-3 mt-6">
-                    <div className="rounded-xl bg-white/5 h-16" />
-                    <div className="rounded-xl bg-white/5 h-16" />
-                    <div className="rounded-xl bg-white/5 h-16" />
-                  </div>
-                </div>
-              </div>
+            {/* BAGIAN KANAN: Gambar Local */}
+            <div className="relative flex justify-center items-center">
+              {/* Efek cahaya di belakang gambar (Glow) */}
+              <div className="absolute inset-0 bg-violet-500/20 blur-[100px] rounded-full"></div>
+
+              <img
+                src="/images/promosi syncro.png" // Sesuaikan dengan nama file-mu di folder public
+                alt="Mobile App Preview"
+                className="relative z-10 w-full max-w-md h-auto object-contain drop-shadow-2xl hover:-translate-y-4 hover:scale-105 transition-all duration-500 ease-out"
+              />
             </div>
           </div>
         </div>

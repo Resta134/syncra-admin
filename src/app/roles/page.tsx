@@ -198,7 +198,7 @@ export default function RolesPage() {
       <div className="space-y-8">
         <div className="flex justify-between items-start">
           <div>
-            <h2 className="text-3xl font-bold text-glow text-cyan-400 uppercase tracking-tight">
+            <h2 className="text-3xl font-bold text-glow text-White-400 tracking-tight">
               Roles & User Access
             </h2>
             <p className="text-gray-400 text-sm">

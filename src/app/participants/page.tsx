@@ -107,7 +107,7 @@ export default function ParticipantsPage() {
       <div className="space-y-8">
         <div className="flex justify-between items-end">
           <div>
-            <h2 className="text-3xl font-bold text-glow text-cyan-400">
+            <h2 className="text-3xl font-bold text-glow text-white-400">
               Participant Directory
             </h2>
             <p className="text-gray-400 text-sm">

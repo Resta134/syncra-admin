@@ -6,51 +6,46 @@ import {
   Globe,
   Zap,
   Volume2,
-  History,
   Languages,
   Save,
   FileUp,
 } from "lucide-react";
 import { useEffect, useState } from "react";
+// Import Supabase Client (Sesuaikan path-nya!)
+import { createClient } from "@supabase/supabase-js";
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL as string;
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string;
+const supabase = createClient(supabaseUrl, supabaseKey);
+
+// Tipe Data untuk Transkrip
+type TranscriptLog = {
+  id: string;
+  event_id: string;
+  speaker: string;
+  original_text: string;
+  translated_text: string;
+  language: string;
+  created_at: string;
+};
 
 export default function TranslationPage() {
-  // State untuk melacak bahasa yang dipilih
+  // --- STATE MANAJEMEN ---
   const [sourceLang, setSourceLang] = useState("Indonesian");
   const [targetLang, setTargetLang] = useState("English (US)");
-
-  // Daftar bahasa yang tersedia di sistem Syncro
-  const availableLanguages = [
-    "Indonesian",
-    "English (US)",
-  ];
-
-  // Fungsi ganti bahasa (simulasi)
-  const toggleSource = () => {
-    const nextIndex =
-      (availableLanguages.indexOf(sourceLang) + 1) % availableLanguages.length;
-    setSourceLang(availableLanguages[nextIndex]);
-  };
-
-  const toggleTarget = () => {
-    const nextIndex =
-      (availableLanguages.indexOf(targetLang) + 1) % availableLanguages.length;
-    setTargetLang(availableLanguages[nextIndex]);
-  };
-
-  // State untuk Audio Visualizer agar tidak hydration error
   const [barHeights, setBarHeights] = useState<number[]>([]);
-  const [isRecording, setIsRecording] = useState(false);
 
-  // Data Simulasi Transkrip yang akan dikelola admin
-  const [transcriptLogs] = useState([
-    { time: "20:05", text: "Initializing AI translation buffers..." },
-    { time: "20:06", text: "Voice signature recognized: Resta Sabrina" },
-    { time: "20:07", text: "Successfully connected to Global Edge Nodes." },
-    { time: "20:08", text: "Terima kasih telah bergabung di SYNCRO AI." },
-  ]);
+  // State untuk Real-time Database
+  const [transcriptLogs, setTranscriptLogs] = useState<TranscriptLog[]>([]);
+  const [isRecording, setIsRecording] = useState(false); // Bisa dihubungkan jika admin butuh pause siaran
 
+  // Asumsi: Admin memilih event dengan ID tertentu.
+  // Untuk sementara kita gunakan ID statis (atau bisa ambil dari props/URL).
+  // GANTI INI dengan event_id yang valid di database Supabase kamu!
+  const currentEventId = "MASUKKAN-UUID-EVENT-YANG-SEDANG-AKTIF-DI-SINI";
+
+  // --- EFEK: SETUP VISUALIZER ---
   useEffect(() => {
-    // Generate tinggi bar sekali saja di sisi client
     const heights = Array.from(
       { length: 30 },
       () => Math.floor(Math.random() * 80) + 20,
@@ -59,21 +54,102 @@ export default function TranslationPage() {
     setBarHeights(heights);
   }, []);
 
-  // FUNGSI: Download Transkrip untuk Admin & User
+  // --- EFEK: AMBIL DATA & DENGARKAN SUPABASE REAL-TIME ---
+  useEffect(() => {
+    // 1. Ambil data transkrip historis saat halaman pertama dibuka
+    const fetchTranscripts = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("transcripts")
+          .select("*")
+          // .eq('event_id', currentEventId) // Buka komen ini kalau mau filter per event
+          .order("created_at", { ascending: false }) // Yang terbaru di atas
+          .limit(20);
+
+        if (error) throw error;
+        if (data) setTranscriptLogs(data);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } catch (error: any) {
+        console.error("Gagal mengambil transkrip:", error.message);
+      }
+    };
+
+    fetchTranscripts();
+
+    // 2. Berlangganan (Subscribe) ke perubahan baru di tabel transcripts
+    const transcriptChannel = supabase
+      .channel("public:transcripts")
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "transcripts",
+          // filter: `event_id=eq.${currentEventId}` // Buka komen ini kalau mau spesifik 1 event
+        },
+        (payload) => {
+          console.log("Transkrip baru masuk!", payload.new);
+          // Tambahkan data baru ke bagian paling atas list
+          setTranscriptLogs((prevLogs) => [
+            payload.new as TranscriptLog,
+            ...prevLogs,
+          ]);
+        },
+      )
+      .subscribe((status) => {
+        if (status === "SUBSCRIBED") {
+          setIsRecording(true); // Animasi nyala kalau terhubung
+        }
+      });
+
+    // Cleanup saat komponen ditutup
+    return () => {
+      supabase.removeChannel(transcriptChannel);
+    };
+  }, []);
+
+  // --- FUNGSI UI ---
+  const availableLanguages = ["Indonesian", "English (US)"];
+  const toggleSource = () =>
+    setSourceLang(
+      availableLanguages[
+        (availableLanguages.indexOf(sourceLang) + 1) % availableLanguages.length
+      ],
+    );
+  const toggleTarget = () =>
+    setTargetLang(
+      availableLanguages[
+        (availableLanguages.indexOf(targetLang) + 1) % availableLanguages.length
+      ],
+    );
+
+  // FUNGSI: Download Transkrip dari Database ke TXT
   const handleSaveTranscript = () => {
-    const content = transcriptLogs
-      .map((log) => `[${log.time}] ${log.text}`)
+    if (transcriptLogs.length === 0)
+      return alert("Belum ada transkrip untuk disimpan!");
+
+    // Susun log dari yang paling lama ke terbaru untuk file teks
+    const content = [...transcriptLogs]
+      .reverse()
+      .map((log) => {
+        const time = new Date(log.created_at).toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+        });
+        return `[${time}] ${log.speaker} (ID): ${log.original_text}\n[${time}] System (EN): ${log.translated_text}\n`;
+      })
       .join("\n");
+
     const blob = new Blob([content], { type: "text/plain" });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "Syncro_Live_Transcript.txt";
+    a.download = `Syncra_Transcript_${new Date().getTime()}.txt`;
     a.click();
     window.URL.revokeObjectURL(url);
   };
 
-  // FUNGSI: Simulasi Upload Materi (Pamflet/Slide)
   const handleUploadMaterial = () => {
     const input = document.createElement("input");
     input.type = "file";
@@ -81,11 +157,7 @@ export default function TranslationPage() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     input.onchange = (e: any) => {
       const file = e.target.files[0];
-      if (file) {
-        alert(
-          `Materi "${file.name}" berhasil diunggah dan akan tampil di aplikasi User.`,
-        );
-      }
+      if (file) alert(`Materi "${file.name}" berhasil diunggah.`);
     };
     input.click();
   };
@@ -94,10 +166,9 @@ export default function TranslationPage() {
     <>
       <Navbar />
       <div className="space-y-8 pb-10">
-        {/* Header dengan tombol aksi baru */}
         <div className="flex justify-between items-start">
           <div>
-            <h2 className="text-3xl font-bold text-glow text-cyan-400 uppercase tracking-tight">
+            <h2 className="text-3xl font-bold text-glow text-white-400 tracking-tight">
               AI Live Translation
             </h2>
             <p className="text-gray-400 text-sm">
@@ -106,18 +177,15 @@ export default function TranslationPage() {
           </div>
 
           <div className="flex gap-3">
-            {/* Action: Upload Materi untuk User */}
             <button
               onClick={handleUploadMaterial}
-              className="flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/10 rounded-xl text-[10px] font-black text-gray-400 hover:text-white hover:bg-white/10 transition-all cursor-pointer shadow-lg"
+              className="flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/10 rounded-xl text-[10px] font-black text-gray-400 hover:text-white hover:bg-white/10 transition-all shadow-lg"
             >
               <FileUp size={14} /> UPLOAD MATERI
             </button>
-
-            {/* Action: Simpan Transkrip */}
             <button
               onClick={handleSaveTranscript}
-              className="flex items-center gap-2 px-4 py-2 bg-cyan-500/10 border border-cyan-500/20 rounded-xl text-[10px] font-black text-cyan-400 hover:bg-cyan-500 hover:text-black transition-all cursor-pointer shadow-[0_0_15px_rgba(6,182,212,0.2)]"
+              className="flex items-center gap-2 px-4 py-2 bg-cyan-500/10 border border-cyan-500/20 rounded-xl text-[10px] font-black text-cyan-400 hover:bg-cyan-500 hover:text-black transition-all shadow-[0_0_15px_rgba(6,182,212,0.2)]"
             >
               <Save size={14} /> SAVE TRANSCRIPT
             </button>
@@ -125,13 +193,12 @@ export default function TranslationPage() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          {/* Main Monitor Panel */}
           <div className="lg:col-span-3 space-y-6">
             <div className="glass-card p-8 min-h-[480px] flex flex-col justify-between relative overflow-hidden">
               <div className="absolute -top-24 -right-24 w-96 h-96 bg-cyan-500/10 blur-[120px] pointer-events-none"></div>
 
               {/* Audio Visualizer */}
-              <div className="flex items-end justify-center gap-1.5 h-16 mb-12">
+              <div className="flex items-end justify-center gap-1.5 h-16 mb-8">
                 {barHeights.length > 0 ? (
                   barHeights.map((h, i) => (
                     <div
@@ -151,42 +218,46 @@ export default function TranslationPage() {
               </div>
 
               {/* Translation Display */}
-              <div className="space-y-10">
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2 text-[10px] font-bold text-gray-500 uppercase tracking-[0.2em]">
-                    <div className="w-2 h-2 rounded-full bg-gray-600"></div>
-                    Input Source (ID)
-                  </div>
-                  <p className="text-2xl font-medium text-white/80 leading-relaxed italic">
-                    {
-                      '"Terima kasih telah bergabung di SYNCRO AI, sistem manajemen event masa depan."'
-                    }
-                  </p>
-                </div>
+              <div className="space-y-6 flex-1 overflow-y-auto custom-scrollbar pr-4">
+                {transcriptLogs.length > 0 ? (
+                  <div className="space-y-10">
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2 text-[10px] font-bold text-gray-500 uppercase tracking-[0.2em]">
+                        <div className="w-2 h-2 rounded-full bg-gray-600 animate-pulse"></div>
+                        Input Source ({transcriptLogs[0].language.toUpperCase()}
+                        ) - {transcriptLogs[0].speaker}
+                      </div>
+                      <p className="text-2xl font-medium text-white/80 leading-relaxed italic">
+                        {transcriptLogs[0].original_text}
+                      </p>
+                    </div>
 
-                <div className="space-y-3 p-8 bg-cyan-500/5 border-l-4 border-cyan-500 rounded-xl relative">
-                  <div className="flex items-center gap-2 text-[10px] font-bold text-cyan-500 uppercase tracking-[0.2em]">
-                    <Zap size={10} />
-                    AI Instant Translation (EN)
+                    <div className="space-y-3 p-8 bg-cyan-500/5 border-l-4 border-cyan-500 rounded-xl relative">
+                      <div className="flex items-center gap-2 text-[10px] font-bold text-cyan-500 uppercase tracking-[0.2em]">
+                        <Zap size={10} /> AI Instant Translation
+                      </div>
+                      <p className="text-3xl font-bold text-cyan-400 text-glow leading-tight italic">
+                        {transcriptLogs[0].translated_text}
+                      </p>
+                    </div>
                   </div>
-                  <p className="text-3xl font-bold text-cyan-400 text-glow leading-tight italic">
-                    {
-                      '"Thank you for joining SYNCRO AI, the future of event management systems."'
-                    }
-                  </p>
-                </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center h-full text-gray-500 italic">
+                    <Mic size={48} className="mb-4 opacity-20" />
+                    <p>Menunggu pemateri untuk mulai berbicara...</p>
+                  </div>
+                )}
               </div>
 
               {/* Interaction Bar */}
-              <div className="mt-12 flex items-center justify-between border-t border-white/5 pt-6">
+              <div className="mt-8 flex items-center justify-between border-t border-white/5 pt-6">
                 <div className="flex gap-4">
                   <button
-                    onClick={() => setIsRecording(!isRecording)}
-                    className={`p-4 rounded-2xl transition-all shadow-lg cursor-pointer ${isRecording ? "bg-red-500 text-white animate-pulse" : "bg-cyan-500 text-black hover:scale-105"}`}
+                    className={`p-4 rounded-2xl transition-all shadow-lg ${isRecording ? "bg-red-500 text-white animate-pulse" : "bg-cyan-500 text-black"}`}
                   >
                     <Mic size={20} />
                   </button>
-                  <button className="p-4 glass-card text-gray-400 hover:text-white transition-all cursor-pointer">
+                  <button className="p-4 glass-card text-gray-400 hover:text-white transition-all">
                     <Volume2 size={20} />
                   </button>
                 </div>
@@ -194,16 +265,20 @@ export default function TranslationPage() {
                   <p className="text-[9px] text-gray-600 uppercase font-bold tracking-widest mb-1">
                     Status
                   </p>
-                  <p className="text-[10px] text-emerald-400 font-mono tracking-tighter">
-                    BROADCASTING TO USERS
+                  <p
+                    className={`text-[10px] font-mono tracking-tighter ${isRecording ? "text-emerald-400" : "text-gray-500"}`}
+                  >
+                    {isRecording ? "LISTENING TO SUPABASE..." : "OFFLINE"}
                   </p>
                 </div>
                 <div className="flex items-center gap-4 px-4 py-2 glass-card border-emerald-500/20">
                   <div className="text-right">
                     <p className="text-[9px] text-gray-500 uppercase font-black">
-                      Latency
+                      Total Logs
                     </p>
-                    <p className="text-xs font-mono text-emerald-400">0.012s</p>
+                    <p className="text-xs font-mono text-emerald-400">
+                      {transcriptLogs.length}
+                    </p>
                   </div>
                   <div className="w-px h-8 bg-white/10"></div>
                   <Languages size={18} className="text-cyan-400" />
@@ -218,7 +293,6 @@ export default function TranslationPage() {
               <Globe size={14} className="text-cyan-400" /> Language Engine
             </h3>
             <div className="space-y-3 text-xs">
-              {/* Source Language Selector */}
               <div
                 onClick={toggleSource}
                 className="p-4 bg-white/5 border border-white/10 rounded-xl flex justify-between items-center group cursor-pointer hover:border-cyan-500/50 hover:bg-cyan-500/5 transition-all"
@@ -233,8 +307,6 @@ export default function TranslationPage() {
                   Src
                 </span>
               </div>
-
-              {/* Target Language Selector */}
               <div
                 onClick={toggleTarget}
                 className="p-4 border border-cyan-500/30 bg-cyan-500/5 rounded-xl flex justify-between items-center group cursor-pointer hover:bg-cyan-500/10 hover:border-cyan-500 transition-all"
