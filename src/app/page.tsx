@@ -16,17 +16,60 @@ import {
   LogOut,
   LayoutDashboard,
   User,
+  CheckCircle, XCircle
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "../lib/supabase"; // Sesuaikan path ini dengan project Anda
 
 export default function SyncroLandingPage() {
   const router = useRouter();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [user, setUser] = useState<any>(null);
   const [profileName, setProfileName] = useState<string>("");
+  // kontak
+  // ================= STATE UNTUK CONTACT FORM =================
+  const [contactForm, setContactForm] = useState({ name: "", email: "", message: "" });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [toast, setToast] = useState<{ show: boolean; type: "success" | "error"; message: string }>({
+    show: false,
+    type: "success",
+    message: "",
+  });
 
+  const handleContactChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    setContactForm({ ...contactForm, [e.target.name]: e.target.value });
+  };
+
+  const handleContactSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+
+    try {
+      // Pastikan tabel di Supabase bernama "contact_messages"
+      const { error } = await supabase
+        .from("contact_messages")
+        .insert([{
+          name: contactForm.name,
+          email: contactForm.email,
+          message: contactForm.message
+        }]);
+
+      if (error) throw error;
+
+      // Tampilkan toast sukses & reset form
+      setToast({ show: true, type: "success", message: "Pesan berhasil dikirim! Tim kami akan segera merespons." });
+      setContactForm({ name: "", email: "", message: "" });
+    } catch (error: any) {
+      // Tampilkan toast error
+      setToast({ show: true, type: "error", message: error.message || "Gagal mengirim pesan." });
+    } finally {
+      setIsSubmitting(false);
+      // Sembunyikan toast setelah 5 detik
+      setTimeout(() => setToast(prev => ({ ...prev, show: false })), 5000);
+    }
+  };
+  //
   // ================= 1. LOGIKA SYNC USER & STATUS PAKET =================
   useEffect(() => {
     const checkUserAndPackage = async () => {
@@ -116,6 +159,17 @@ export default function SyncroLandingPage() {
 
   return (
     <main className="bg-[#070B1A] text-white overflow-hidden">
+      {/* ================= TOAST NOTIFICATION ================= */}
+      {toast.show && (
+        <div className={`fixed top-24 left-1/2 -translate-x-1/2 z-[100] px-6 py-3 rounded-2xl flex items-center gap-3 shadow-2xl transition-all border ${
+          toast.type === "success" 
+            ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" 
+            : "bg-red-500/10 text-red-400 border-red-500/20"
+        }`}>
+          {toast.type === "success" ? <CheckCircle size={20} /> : <XCircle size={20} />}
+          <span className="font-medium text-sm">{toast.message}</span>
+        </div>
+      )}
       {/* ================= BACKGROUND EFFECT ================= */}
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,#6d28d9_0%,transparent_30%)] opacity-30" />
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom_left,#2563eb_0%,transparent_30%)] opacity-20" />
@@ -123,9 +177,12 @@ export default function SyncroLandingPage() {
       {/* ================= NAVBAR ================= */}
       <header className="sticky top-0 z-50 backdrop-blur-xl border-b border-white/10 bg-[#070B1A]/80">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-600 to-blue-500" />
-            <h1 className="text-xl font-bold tracking-wide">SYNCRO AI</h1>
+          <div className="flex items-center">
+            <img
+              src="/images/logo2.png"
+              alt="Syncro AI Logo"
+              // Ubah w-8 h-8 menjadi angka yang lebih besar, contohnya w-12 h-12
+              className="w-50 h-20 rounded-lg object-contain" />
           </div>
 
           <nav className="hidden md:flex items-center gap-8 text-sm text-gray-300">
@@ -418,11 +475,9 @@ export default function SyncroLandingPage() {
               </p>
               <div className="flex flex-wrap gap-4 mt-10">
                 <button className="px-6 py-4 rounded-2xl bg-white text-black font-semibold flex items-center gap-2 hover:bg-gray-200 transition">
-                  <Download size={18} /> Google Play
+                  <Download size={18} /> Unduh
                 </button>
-                <button className="px-6 py-4 rounded-2xl border border-white/10 text-white hover:bg-white/5 transition">
-                  App Store
-                </button>
+
               </div>
             </div>
 
@@ -469,25 +524,44 @@ export default function SyncroLandingPage() {
             </div>
           </div>
 
+          {/* BAGIAN KANAN: FORM */}
           <div className="rounded-3xl border border-white/10 bg-white/5 p-8">
-            <div className="space-y-5">
+            <form onSubmit={handleContactSubmit} className="space-y-5">
               <input
+                type="text"
+                name="name"
+                value={contactForm.name}
+                onChange={handleContactChange}
+                required
                 placeholder="Nama Lengkap"
-                className="w-full rounded-2xl bg-[#10172A] border border-white/5 px-5 py-4 outline-none"
+                className="w-full rounded-2xl bg-[#10172A] border border-white/5 px-5 py-4 outline-none focus:border-violet-500/50 transition-colors"
               />
               <input
+                type="email"
+                name="email"
+                value={contactForm.email}
+                onChange={handleContactChange}
+                required
                 placeholder="Email"
-                className="w-full rounded-2xl bg-[#10172A] border border-white/5 px-5 py-4 outline-none"
+                className="w-full rounded-2xl bg-[#10172A] border border-white/5 px-5 py-4 outline-none focus:border-violet-500/50 transition-colors"
               />
               <textarea
+                name="message"
+                value={contactForm.message}
+                onChange={handleContactChange}
+                required
                 rows={5}
                 placeholder="Tulis pesan Anda..."
-                className="w-full rounded-2xl bg-[#10172A] border border-white/5 px-5 py-4 outline-none"
+                className="w-full rounded-2xl bg-[#10172A] border border-white/5 px-5 py-4 outline-none resize-none focus:border-violet-500/50 transition-colors"
               />
-              <button className="w-full py-4 rounded-2xl bg-gradient-to-r from-violet-600 to-blue-500 font-semibold">
-                Kirim Pesan
+              <button 
+                type="submit" 
+                disabled={isSubmitting}
+                className="w-full py-4 rounded-2xl bg-gradient-to-r from-violet-600 to-blue-500 font-semibold cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90 transition-opacity"
+              >
+                {isSubmitting ? "Mengirim..." : "Kirim Pesan"}
               </button>
-            </div>
+            </form>
           </div>
         </div>
       </section>
@@ -560,11 +634,10 @@ function PricingCard({
 
       <button
         onClick={onSelect}
-        className={`w-full py-4 rounded-2xl mt-10 font-semibold cursor-pointer transition-all ${
-          popular
+        className={`w-full py-4 rounded-2xl mt-10 font-semibold cursor-pointer transition-all ${popular
             ? "bg-gradient-to-r from-violet-600 to-blue-500 text-white shadow-[0_0_20px_rgba(109,40,217,0.3)]"
             : "border border-white/10 hover:bg-white/5 text-white"
-        }`}
+          }`}
       >
         Pilih Paket
       </button>

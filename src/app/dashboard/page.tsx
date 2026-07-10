@@ -168,61 +168,7 @@ export default function Home() {
         </div>
 
         {/* SECTION 2: ANALYTICS CHART (Data dari MongoDB via API) */}
-        <div className="glass-card p-6 border border-white/5">
-          <div className="mb-6">
-            <h3 className="text-lg font-bold text-white flex items-center gap-2">
-              <Calendar size={18} className="text-cyan-400" /> Tren Event
-              Bulanan (Scraped Data)
-            </h3>
-            <p className="text-xs text-gray-500">
-              Visualisasi pertumbuhan event yang direkam di MongoDB.
-            </p>
-          </div>
-
-          <div className="h-[350px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart
-                data={chartData}
-                margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
-              >
-                <CartesianGrid
-                  strokeDasharray="3 3"
-                  stroke="#1f2937"
-                  vertical={false}
-                />
-                <XAxis
-                  dataKey="bulan"
-                  stroke="#6b7280"
-                  fontSize={12}
-                  tickLine={false}
-                  axisLine={false}
-                />
-                <YAxis
-                  stroke="#6b7280"
-                  fontSize={12}
-                  tickLine={false}
-                  axisLine={false}
-                />
-                <Tooltip
-                  cursor={{ fill: "#1f2937", opacity: 0.4 }}
-                  contentStyle={{
-                    backgroundColor: "#111827",
-                    borderColor: "#374151",
-                    borderRadius: "8px",
-                    color: "#fff",
-                  }}
-                />
-                <Bar
-                  dataKey="total_event"
-                  fill="#06b6d4"
-                  radius={[4, 4, 0, 0]}
-                  barSize={40}
-                  animationDuration={1500}
-                />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
+       
       </div>
     </>
   );

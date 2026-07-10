@@ -9,85 +9,62 @@ import {
   MoreVertical,
   Download,
 } from "lucide-react";
-import { useState, useMemo } from "react";
+import { useState, useEffect,useMemo } from 'react';
+// Pastikan Anda sudah menginisialisasi client Supabase di file terpisah
+// Sesuaikan path import di bawah ini dengan struktur folder Anda (misal: '@/lib/supabase')
+import { supabase } from '@/lib/supabase';
 
 interface Participant {
   id: number;
-  name: string;
-  email: string;
-  status: string;
-  language: string;
-  confidence: string;
-  lastSeen: string;
+  full_name: string;
+  waktu_checkin: string;
 }
 
 export default function ParticipantsPage() {
-  const [participants] = useState<Participant[]>([
-    {
-      id: 1,
-      name: "Rhiki Sulistiyo",
-      email: "rhiki@syncro.ai",
-      status: "Verified",
-      language: "Indonesian",
-      confidence: "99.8%",
-      lastSeen: "10:45 AM",
-    },
-    {
-      id: 2,
-      name: "Ahmat Fauzi",
-      email: "fauzi@syncro.ai",
-      status: "Verified",
-      language: "English",
-      confidence: "98.2%",
-      lastSeen: "10:50 AM",
-    },
-    {
-      id: 3,
-      name: "M. Iqbal Saputra",
-      email: "iqbal@syncro.ai",
-      status: "Pending",
-      language: "Indonesian",
-      confidence: "N/A",
-      lastSeen: "Waiting",
-    },
-    {
-      id: 4,
-      name: "David L.",
-      email: "david@enterprise.com",
-      status: "Verified",
-      language: "English",
-      confidence: "97.5%",
-      lastSeen: "11:02 AM",
-    },
-    {
-      id: 5,
-      name: "Siti Aminah",
-      email: "siti@event.com",
-      status: "Verified",
-      language: "Mandarin",
-      confidence: "99.1%",
-      lastSeen: "11:15 AM",
-    },
-  ]);
-
+  // 2. Kosongkan state awal
+  const [participants, setParticipants] = useState<Participant[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Fungsi Pencarian Berfungsi (Sesuai dengan input di image_87ba56.png)
+  // 3. Ambil data dari Supabase saat komponen dimuat
+  useEffect(() => {
+    const fetchParticipants = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("attendance")
+          .select("id, full_name, waktu_checkin")
+          .order("waktu_checkin", { ascending: false }); // Urutkan dari yang terbaru (opsional)
+
+        if (error) {
+          console.error("Error fetching data dari Supabase:", error);
+          return;
+        }
+
+        if (data) {
+          setParticipants(data);
+        }
+      } catch (error) {
+        console.error("Unexpected error:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchParticipants();
+  }, []);
+
+  // 4. Sesuaikan variabel pencarian ke full_name
   const filteredParticipants = useMemo(() => {
-    return participants.filter(
-      (p) =>
-        p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        p.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        p.language.toLowerCase().includes(searchQuery.toLowerCase()),
+    return participants.filter((p) =>
+      p.full_name.toLowerCase().includes(searchQuery.toLowerCase())
     );
   }, [searchQuery, participants]);
 
-  // Fungsi Export Data ke CSV
+  // 5. Sesuaikan variabel export ke full_name dan waktu_checkin
   const handleExport = () => {
-    const headers = ["ID,Name,Email,Status,Language,Confidence,Last Seen\n"];
+    const headers = ["ID,Full Name,Check-in Time\n"];
     const rows = filteredParticipants.map(
-      (p) =>
-        `${p.id},${p.name},${p.email},${p.status},${p.language},${p.confidence},${p.lastSeen}\n`,
+      (p) => `${p.id},${p.full_name},${p.waktu_checkin}\n`
     );
 
     const blob = new Blob([...headers, ...rows], { type: "text/csv" });
@@ -151,15 +128,20 @@ export default function ParticipantsPage() {
             <thead>
               <tr className="bg-white/5 text-gray-500 text-[10px] uppercase tracking-widest font-bold">
                 <th className="px-6 py-5">Participant</th>
-                <th className="px-6 py-5">Face Status</th>
-                <th className="px-6 py-5 text-center">Confidence</th>
-                <th className="px-6 py-5">Language</th>
                 <th className="px-6 py-5">Last Check-in</th>
-                {/* <th className="px-6 py-5 text-right">Action</th> */}
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
-              {filteredParticipants.length > 0 ? (
+              {isLoading ? (
+                <tr>
+                  <td
+                    colSpan={2}
+                    className="px-6 py-20 text-center text-gray-500 text-sm"
+                  >
+                    Memuat data dari database...
+                  </td>
+                </tr>
+              ) : filteredParticipants.length > 0 ? (
                 filteredParticipants.map((p) => (
                   <tr
                     key={p.id}
@@ -167,72 +149,30 @@ export default function ParticipantsPage() {
                   >
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-xs font-bold text-cyan-400">
-                          {p.name.charAt(0)}
+                        <div className="w-10 h-10 rounded-full bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-xs font-bold text-cyan-400 uppercase">
+                          {/* 6. Update variabel UI ke full_name */}
+                          {p.full_name ? p.full_name.charAt(0) : "?"}
                         </div>
                         <div>
                           <p className="text-sm font-bold text-white group-hover:text-cyan-400 transition-colors">
-                            {p.name}
+                            {p.full_name}
                           </p>
-                          <p className="text-[10px] text-gray-500">{p.email}</p>
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4">
-                      <span
-                        className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-[10px] font-bold border ${
-                          p.status === "Verified"
-                            ? "border-emerald-500/30 text-emerald-400 bg-emerald-500/10"
-                            : "border-amber-500/30 text-amber-400 bg-amber-400/10"
-                        }`}
-                      >
-                        {p.status === "Verified" ? (
-                          <UserCheck size={12} />
-                        ) : (
-                          <UserX size={12} />
-                        )}
-                        {p.status.toUpperCase()}
-                      </span>
+                    <td className="px-6 py-4 text-xs text-white-500 font-mono">
+                      {/* 7. Update variabel UI ke waktu_checkin */}
+                      {p.waktu_checkin}
                     </td>
-                    <td className="px-6 py-4">
-                      <div className="flex flex-col items-center gap-1.5">
-                        <div className="w-24 h-1.5 bg-white/5 rounded-full overflow-hidden">
-                          <div
-                            className="h-full bg-cyan-500 shadow-[0_0_8px_rgba(6,182,212,0.5)]"
-                            style={{
-                              width:
-                                p.confidence !== "N/A" ? p.confidence : "0%",
-                            }}
-                          ></div>
-                        </div>
-                        <span className="text-[10px] font-mono text-gray-500">
-                          {p.confidence}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2 text-xs text-gray-300">
-                        <Globe size={14} className="text-cyan-500" />
-                        {p.language}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-xs text-gray-500 font-mono">
-                      {p.lastSeen}
-                    </td>
-                    {/* <td className="px-6 py-4 text-right">
-                      <button className="p-2 hover:bg-white/5 rounded-lg text-gray-600 hover:text-white transition-all cursor-pointer">
-                        <MoreVertical size={18} />
-                      </button>
-                    </td> */}
                   </tr>
                 ))
               ) : (
                 <tr>
                   <td
-                    colSpan={6}
+                    colSpan={2}
                     className="px-6 py-20 text-center text-gray-500 text-sm italic"
                   >
-                    No participants found for {searchQuery}
+                    No participants found for "{searchQuery}"
                   </td>
                 </tr>
               )}
@@ -256,5 +196,4 @@ export default function ParticipantsPage() {
         </div>
       </div>
     </>
-  );
-}
+  );}

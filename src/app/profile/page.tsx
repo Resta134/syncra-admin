@@ -1,8 +1,65 @@
 "use client";
 import Navbar from "@/components/Navbar";
+import { supabase } from "@/lib/supabase";
 import { User, Mail, Shield, MapPin } from 'lucide-react';
+import { useEffect, useState } from "react";
+
+interface Profile {
+  id: string;
+  full_name: string;
+  email: string;
+  package_tier: string;
+}
 
 export default function ProfilePage() {
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchProfile() {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+
+        if (user) {
+          const { data, error } = await supabase
+            .from('profiles')
+            .select('id, full_name, email, package_tier')
+            .eq('id', user.id)
+            .single();
+
+          if (data) setProfile(data);
+        }
+      } catch (error) {
+        console.error("Error fetching profile:", error);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchProfile();
+  }, []);
+
+  // Logika Pemformatan ID Baru
+  const formatCustomId = (tier: string, fullId: string) => {
+    // 1. Kondisi khusus jika package_tier adalah 'Starter'
+    if (tier?.toLowerCase() === 'starter') {
+      return 'SYNC-Super-Admin';
+    }
+    
+    // 2. Format default untuk Enterprise, Free, dll (Contoh: SYNC-B2B2F391)
+    const shortId = fullId.slice(0, 8).toUpperCase();
+    return `SYNC-${shortId}`;
+  };
+
+  if (loading) {
+    return (
+      <>
+        <Navbar />
+        <div className="max-w-4xl p-8 text-center text-gray-400">Loading profile data...</div>
+      </>
+    );
+  }
+
   return (
     <>
       <Navbar />
@@ -13,8 +70,11 @@ export default function ProfilePage() {
             <User size={48} className="text-black" />
           </div>
           <div>
-            <h2 className="text-3xl font-bold">Resta Sabrina</h2>
-            <p className="text-cyan-400 font-mono text-sm tracking-widest uppercase">ID: SYNC-2026-001</p>
+            <h2 className="text-3xl font-bold">{profile?.full_name || "Anonymous"}</h2>
+            {/* Menampilkan ID yang sudah diformat sesuai logika baru */}
+            <p className="text-cyan-400 font-mono text-sm tracking-widest uppercase">
+              {profile ? formatCustomId(profile.package_tier, profile.id) : "SYNC-XXXXXX"}
+            </p>
           </div>
         </div>
 
@@ -23,7 +83,7 @@ export default function ProfilePage() {
             <h3 className="text-sm font-bold text-gray-400 uppercase tracking-widest">Personal Info</h3>
             <div className="space-y-4">
               <div className="flex items-center gap-3 text-sm">
-                <Mail size={16} className="text-cyan-500" /> resta@syncra.ai
+                <Mail size={16} className="text-cyan-500" /> {profile?.email || "No email available"}
               </div>
               <div className="flex items-center gap-3 text-sm">
                 <MapPin size={16} className="text-cyan-500" /> Tegal, Central Java

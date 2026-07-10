@@ -3,6 +3,11 @@
 import { usePathname } from "next/navigation";
 import Sidebar from "@/components/Sidebar";
 import "./globals.css";
+import { Geist } from "next/font/google";
+import { cn } from "@/lib/utils";
+
+const geist = Geist({subsets:['latin'],variable:'--font-sans'});
+
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -14,7 +19,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   const isAuthOrLanding = noSidebarPages.includes(pathname);
 
   return (
-    <html lang="en">
+    <html lang="en" className={cn("font-sans", geist.variable)}>
       <body className="bg-[#050505] text-white flex min-h-screen">
         {/* Sidebar HANYA muncul jika BUKAN halaman auth atau landing */}
         {!isAuthOrLanding && <Sidebar />}

@@ -18,7 +18,7 @@ import {
   Mic, // <-- Tambahan icon Mic untuk pemateri
 } from "lucide-react";
 import { useState, useMemo, useEffect } from "react";
-import { supabase } from "@/lib/supabase"; 
+import { supabase } from "@/lib/supabase";
 
 // --- 1. UPDATE INTERFACE (Tambahan Speaker) ---
 interface EventData {
@@ -45,7 +45,7 @@ export default function EventsPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<EventData | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
-  
+
   // --- 2. UPDATE DEFAULT STATE (Tambahan Speaker) ---
   const [formData, setFormData] = useState<Partial<EventData>>({
     title: "",
@@ -84,7 +84,7 @@ export default function EventsPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true); 
+    setLoading(true);
 
     try {
       let finalImageUrl = formData.image_url;
@@ -146,7 +146,7 @@ export default function EventsPage() {
       setImageFile(null);
       fetchEvents();
       closeModal();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
       console.error("Submit Error:", error);
       alert("Proses Gagal: " + error.message);
@@ -264,13 +264,12 @@ export default function EventsPage() {
                   <div className="absolute inset-0 bg-gradient-to-t from-[#0a0a0a] to-transparent" />
                   <div className="absolute top-4 left-4">
                     <span
-                      className={`text-[9px] font-bold uppercase px-2 py-1 rounded border ${
-                        event.status === "Ongoing"
+                      className={`text-[9px] font-bold uppercase px-2 py-1 rounded border ${event.status === "Ongoing"
                           ? "border-emerald-500 text-emerald-400 bg-emerald-400/10"
                           : event.status === "Upcoming"
                             ? "border-cyan-500 text-cyan-400 bg-cyan-400/10"
                             : "border-gray-500 text-gray-400 bg-gray-500/10"
-                      }`}
+                        }`}
                     >
                       {event.status}
                     </span>
@@ -323,12 +322,10 @@ export default function EventsPage() {
                     <div className="flex items-center gap-2">
                       <Ticket
                         size={14}
-                        className={
-                          event.price === 0 || !event.price
+                        className={`shrink-0 ${event.price === 0 || !event.price
                             ? "text-emerald-500"
                             : "text-yellow-500"
-                        }
-                        shrink-0
+                          }`}
                       />
                       Harga:{" "}
                       <span
@@ -341,10 +338,10 @@ export default function EventsPage() {
                         {event.price === 0 || !event.price
                           ? "GRATIS"
                           : new Intl.NumberFormat("id-ID", {
-                              style: "currency",
-                              currency: "IDR",
-                              minimumFractionDigits: 0,
-                            }).format(event.price)}
+                            style: "currency",
+                            currency: "IDR",
+                            minimumFractionDigits: 0,
+                          }).format(event.price)}
                       </span>
                     </div>
                   </div>
@@ -515,11 +512,10 @@ export default function EventsPage() {
                         quota: formData.quota === "Unlimited" ? 0 : "Unlimited",
                       })
                     }
-                    className={`px-3 rounded-xl border text-[8px] font-black transition-all ${
-                      formData.quota === "Unlimited"
+                    className={`px-3 rounded-xl border text-[8px] font-black transition-all ${formData.quota === "Unlimited"
                         ? "bg-cyan-500 text-black border-cyan-500 shadow-[0_0_15px_rgba(6,182,212,0.4)]"
                         : "border-white/10 text-gray-500"
-                    }`}
+                      }`}
                   >
                     UNLIMITED
                   </button>
@@ -606,7 +602,7 @@ export default function EventsPage() {
                     onChange={(e) => {
                       const file = e.target.files?.[0];
                       if (file) {
-                        setImageFile(file); 
+                        setImageFile(file);
                         setFormData({
                           ...formData,
                           image_url: URL.createObjectURL(file),

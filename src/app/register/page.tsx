@@ -136,7 +136,7 @@ export default function RegisterPage() {
             </div>
 
             <button disabled={loading} className="w-full bg-white text-black font-black py-4 rounded-2xl transition-all flex items-center justify-center gap-2 uppercase text-xs tracking-widest mt-4 cursor-pointer">
-              {loading ? <Loader2 className="animate-spin" size={18} /> : <>Register System <ArrowRight size={18} /></>}
+              {loading ? <Loader2 className="animate-spin" size={18} /> : <>Register System<ArrowRight size={18} /></>}
             </button>
           </form>
         </div>
