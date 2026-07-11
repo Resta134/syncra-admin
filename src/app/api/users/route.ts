@@ -3,10 +3,11 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
 // Menggunakan Service Role Key khusus admin agar bisa bypass RLS saat mengelola user
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY! // Pastikan key ini ada di file .env.local kamu
-);
+// VAKSIN VERCEL: Wajib pakai dummy URL jika env kosong saat build
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://dummy.supabase.co";
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "dummy-key"; 
+
+const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
 // 1. GET: Ambil semua data user untuk ditampilkan di tabel web
 export async function GET() {

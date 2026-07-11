@@ -2,11 +2,11 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
-// Menggunakan SERVICE_ROLE_KEY agar bisa mendaftarkan user lain tanpa verifikasi email
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!, // Ambil dari Dashboard Supabase -> Settings -> API
-);
+// VAKSIN VERCEL: Wajib pakai dummy URL jika env kosong saat build
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://dummy.supabase.co";
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "dummy-key"; 
+
+const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
 export async function POST(request: Request) {
   try {
