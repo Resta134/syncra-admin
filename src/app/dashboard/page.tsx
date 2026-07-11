@@ -39,25 +39,32 @@ export default function Home() {
   // ================= UTAMA: SATPAM PENGUNCI DASHBOARD & FETCH DATA =================
   useEffect(() => {
     const initializeDashboard = async () => {
-      // 1. Cek Sesi Auth
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      if (!user) {
-        alert("Akses ditolak! Anda harus masuk (login) terlebih dahulu.");
-        router.push("/login");
-        return; // Hentikan eksekusi jika tidak login
+      // 0. Benteng Awal: Cek apakah client supabase aktif
+      if (!supabase) {
+        console.error("❌ Supabase client gagal diinisialisasi. Periksa .env");
+        setLoading(false);
+        return;
       }
 
-      // 2. Jika valid, ambil perhitungan total data langsung dari tabel Supabase
+      // 1. Cek Sesi Auth (TypeScript sekarang tahu pasti 'supabase' tidak null)
       try {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+
+        if (!user) {
+          alert("Akses ditolak! Anda harus masuk (login) terlebih dahulu.");
+          router.push("/login");
+          return; // Hentikan eksekusi jika tidak login
+        }
+
+        // 2. Jika valid, ambil perhitungan total data langsung dari tabel Supabase
         // Menghitung total baris di tabel 'events'
         const { count: eventsCount } = await supabase
           .from("events")
           .select("*", { count: "exact", head: true });
 
-        // Menghitung total baris partisipan (Misal dari tabel 'tickets' atau 'profiles')
+        // Menghitung total baris partisipan
         const { count: participantsCount } = await supabase
           .from("profiles")
           .select("*", { count: "exact", head: true });
@@ -73,7 +80,6 @@ export default function Home() {
 
       // 3. Ambil data analitik hasil scraping dari MongoDB via API Next.js
       try {
-        // Pastikan kamu membuat file route.ts di folder app/api/analytics
         const response = await fetch("/api/analytics");
         if (response.ok) {
           const mongoData = await response.json();
@@ -168,7 +174,6 @@ export default function Home() {
         </div>
 
         {/* SECTION 2: ANALYTICS CHART (Data dari MongoDB via API) */}
-       
       </div>
     </>
   );

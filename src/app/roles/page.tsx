@@ -39,6 +39,11 @@ export default function RolesPage() {
   });
 
   const fetchUsersFromSupabase = async () => {
+    if (!supabase) {
+      console.warn("⚠️ Supabase client belum siap.");
+      setLoading(false);
+      return;
+    }
     try {
       setLoading(true);
       // Mengambil seluruh data profil kru dari tabel

@@ -23,24 +23,36 @@ export default function LoginPage() {
       return;
     }
 
+    // Benteng pengaman untuk TypeScript & Vercel build
+    if (!supabase) {
+      alert("Koneksi gagal: Supabase client belum siap. Periksa environment variables Anda.");
+      return;
+    }
+
     setLoading(true);
 
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    try {
+      // TypeScript sekarang tahu pasti 'supabase' tidak null
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
-    if (error) {
-      alert("Login Gagal: " + error.message);
+      if (error) {
+        alert("Login Gagal: " + error.message);
+        setLoading(false);
+        return; 
+      }
+
+      if (data?.user) {
+        router.push("/dashboard");
+      }
+    } catch (err: any) {
+      console.error("Login Error:", err);
+      alert("Terjadi kesalahan sistem.");
+    } finally {
       setLoading(false);
-      return; // Berhenti di sini jika data akun salah/kosong
     }
-
-    // Jika akun benar, baru diizinkan pindah ke dashboard
-    if (data?.user) {
-      router.push("/dashboard");
-    }
-    setLoading(false);
   };
 
   return (

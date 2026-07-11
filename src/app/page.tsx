@@ -16,7 +16,8 @@ import {
   LogOut,
   LayoutDashboard,
   User,
-  CheckCircle, XCircle
+  CheckCircle,
+  XCircle,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -27,80 +28,119 @@ export default function SyncroLandingPage() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [user, setUser] = useState<any>(null);
   const [profileName, setProfileName] = useState<string>("");
-  // kontak
+
   // ================= STATE UNTUK CONTACT FORM =================
-  const [contactForm, setContactForm] = useState({ name: "", email: "", message: "" });
+  const [contactForm, setContactForm] = useState({
+    name: "",
+    email: "",
+    message: "",
+  });
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [toast, setToast] = useState<{ show: boolean; type: "success" | "error"; message: string }>({
+  const [toast, setToast] = useState<{
+    show: boolean;
+    type: "success" | "error";
+    message: string;
+  }>({
     show: false,
     type: "success",
     message: "",
   });
 
-  const handleContactChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleContactChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
+  ) => {
     setContactForm({ ...contactForm, [e.target.name]: e.target.value });
   };
 
   const handleContactSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // 1. BENTENG PENGAMAN FORM KONTAK
+    if (!supabase) {
+      setToast({
+        show: true,
+        type: "error",
+        message: "Koneksi gagal: Layanan database belum siap.",
+      });
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
       // Pastikan tabel di Supabase bernama "contact_messages"
-      const { error } = await supabase
-        .from("contact_messages")
-        .insert([{
+      const { error } = await supabase.from("contact_messages").insert([
+        {
           name: contactForm.name,
           email: contactForm.email,
-          message: contactForm.message
-        }]);
+          message: contactForm.message,
+        },
+      ]);
 
       if (error) throw error;
 
-      // Tampilkan toast sukses & reset form
-      setToast({ show: true, type: "success", message: "Pesan berhasil dikirim! Tim kami akan segera merespons." });
+      setToast({
+        show: true,
+        type: "success",
+        message: "Pesan berhasil dikirim! Tim kami akan segera merespons.",
+      });
       setContactForm({ name: "", email: "", message: "" });
     } catch (error: any) {
-      // Tampilkan toast error
-      setToast({ show: true, type: "error", message: error.message || "Gagal mengirim pesan." });
+      setToast({
+        show: true,
+        type: "error",
+        message: error.message || "Gagal mengirim pesan.",
+      });
     } finally {
       setIsSubmitting(false);
-      // Sembunyikan toast setelah 5 detik
-      setTimeout(() => setToast(prev => ({ ...prev, show: false })), 5000);
+      setTimeout(() => setToast((prev) => ({ ...prev, show: false })), 5000);
     }
   };
-  //
+
   // ================= 1. LOGIKA SYNC USER & STATUS PAKET =================
   useEffect(() => {
     const checkUserAndPackage = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (user) {
-        setUser(user);
+      // 2. BENTENG PENGAMAN INITIALIZE USER
+      if (!supabase) {
+        console.warn(
+          "⚠️ Supabase client belum siap atau konfigurasi .env kosong.",
+        );
+        return;
+      }
 
-        // Mengambil data profile pengguna secara realtime dari database public
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("full_name, package_tier")
-          .eq("id", user.id)
-          .single();
+      try {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
 
-        if (profile) {
-          setProfileName(profile.full_name || user.email?.split("@")[0]);
-          // Menyisipkan tingkat tier paket ke dalam state local user
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          setUser((prev: any) => ({
-            ...prev,
-            package_tier: profile.package_tier,
-          }));
+        if (user) {
+          setUser(user);
+
+          const { data: profile } = await supabase
+            .from("profiles")
+            .select("full_name, package_tier")
+            .eq("id", user.id)
+            .single();
+
+          if (profile) {
+            setProfileName(profile.full_name || user.email?.split("@")[0]);
+
+            setUser((prev: any) => ({
+              ...prev,
+              package_tier: profile.package_tier,
+            }));
+          }
         }
+      } catch (error) {
+        console.error("Gagal memeriksa user atau paket:", error);
       }
     };
 
     checkUserAndPackage();
 
-    // Memantau perubahan status auth (jika login/logout di tab lain)
+    // 3. BENTENG PENGAMAN UNTUK AUTH LISTENER
+    if (!supabase) return;
+
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -112,61 +152,90 @@ export default function SyncroLandingPage() {
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      if (subscription) subscription.unsubscribe();
+    };
   }, []);
 
   // ================= 2. FUNGSI UPDATE PEMBELIAN PAKET =================
   const handleSelectPackage = async (tier: string) => {
-    const {
-      data: { user: currentUser },
-    } = await supabase.auth.getUser();
-
-    if (!currentUser) {
-      alert(
-        "Kamu harus login atau register terlebih dahulu untuk memilih paket!",
-      );
-      router.push("/login");
+    // 4. BENTENG PENGAMAN PEMILIHAN PAKET
+    if (!supabase) {
+      alert("Koneksi gagal: Layanan database belum siap.");
       return;
     }
 
-    // Melakukan update status paket pada tabel profile
-    const { error } = await supabase
-      .from("profiles")
-      .update({ package_tier: tier })
-      .eq("id", currentUser.id);
+    try {
+      const {
+        data: { user: currentUser },
+      } = await supabase.auth.getUser();
 
-    if (error) {
-      alert("Gagal memproses paket: " + error.message);
-    } else {
-      alert(`Sukses! Akun kamu kini aktif dengan paket ${tier}.`);
+      if (!currentUser) {
+        alert(
+          "Kamu harus login atau register terlebih dahulu untuk memilih paket!",
+        );
+        router.push("/login");
+        return;
+      }
 
-      // Mengubah state lokal secara instan agar UI tombol dashboard langsung muncul
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      setUser((prev: any) => ({ ...prev, package_tier: tier }));
+      const { error } = await supabase
+        .from("profiles")
+        .update({ package_tier: tier })
+        .eq("id", currentUser.id);
 
-      // Mengarahkan admin langsung ke dashboard manajemen sistem
-      router.push("/dashboard");
+      if (error) {
+        alert("Gagal memproses paket: " + error.message);
+      } else {
+        alert(`Sukses! Akun kamu kini aktif dengan paket ${tier}.`);
+        setUser((prev: any) => ({ ...prev, package_tier: tier }));
+        router.push("/dashboard");
+      }
+    } catch (err: any) {
+      console.error("Package Selection Error:", err);
+      alert("Terjadi kesalahan sistem saat memilih paket.");
     }
   };
 
   // ================= 3. FUNGSI LOGOUT (REVOKE TOKEN) =================
   const handleLogout = async () => {
-    await supabase.auth.signOut();
-    setUser(null);
-    setProfileName("");
-    router.refresh();
+    // 5. BENTENG PENGAMAN LOGOUT
+    if (!supabase) {
+      console.warn(
+        "⚠️ Supabase client belum siap, memaksa pembersihan state lokal.",
+      );
+      setUser(null);
+      setProfileName("");
+      router.refresh();
+      return;
+    }
+
+    try {
+      await supabase.auth.signOut();
+    } catch (error) {
+      console.error("Gagal melakukan signOut ke server Supabase:", error);
+    } finally {
+      setUser(null);
+      setProfileName("");
+      router.refresh();
+    }
   };
 
   return (
     <main className="bg-[#070B1A] text-white overflow-hidden">
       {/* ================= TOAST NOTIFICATION ================= */}
       {toast.show && (
-        <div className={`fixed top-24 left-1/2 -translate-x-1/2 z-[100] px-6 py-3 rounded-2xl flex items-center gap-3 shadow-2xl transition-all border ${
-          toast.type === "success" 
-            ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" 
-            : "bg-red-500/10 text-red-400 border-red-500/20"
-        }`}>
-          {toast.type === "success" ? <CheckCircle size={20} /> : <XCircle size={20} />}
+        <div
+          className={`fixed top-24 left-1/2 -translate-x-1/2 z-[100] px-6 py-3 rounded-2xl flex items-center gap-3 shadow-2xl transition-all border ${
+            toast.type === "success"
+              ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+              : "bg-red-500/10 text-red-400 border-red-500/20"
+          }`}
+        >
+          {toast.type === "success" ? (
+            <CheckCircle size={20} />
+          ) : (
+            <XCircle size={20} />
+          )}
           <span className="font-medium text-sm">{toast.message}</span>
         </div>
       )}
@@ -181,29 +250,33 @@ export default function SyncroLandingPage() {
             <img
               src="/images/logo2.png"
               alt="Syncro AI Logo"
-              // Ubah w-8 h-8 menjadi angka yang lebih besar, contohnya w-12 h-12
-              className="w-50 h-20 rounded-lg object-contain" />
+              className="w-50 h-20 rounded-lg object-contain"
+            />
           </div>
 
           <nav className="hidden md:flex items-center gap-8 text-sm text-gray-300">
             <a href="#home" className="hover:text-white transition">
-              Beranda
+              {" "}
+              Beranda{" "}
             </a>
             <a href="#features" className="hover:text-white transition">
-              Fitur
+              {" "}
+              Fitur{" "}
             </a>
             <a href="#pricing" className="hover:text-white transition">
-              Paket
+              {" "}
+              Paket{" "}
             </a>
             <a href="#download" className="hover:text-white transition">
-              Download
+              {" "}
+              Download{" "}
             </a>
             <a href="#contact" className="hover:text-white transition">
-              Kontak
+              {" "}
+              Kontak{" "}
             </a>
           </nav>
 
-          {/* PERBAIKAN: DINAMIS NAVBAR AUTH BUTTONS */}
           <div className="flex items-center gap-3">
             {user ? (
               <div className="flex items-center gap-3 bg-white/5 border border-white/10 p-1.5 pr-4 rounded-2xl">
@@ -220,7 +293,6 @@ export default function SyncroLandingPage() {
                 </div>
                 <div className="h-6 w-[1px] bg-white/10 mx-1" />
 
-                {/* Aturan Proteksi: Tombol admin hanya merender jika tier paket bukan 'Free' */}
                 {user.package_tier && user.package_tier !== "Free" && (
                   <button
                     onClick={() => router.push("/dashboard")}
@@ -266,7 +338,6 @@ export default function SyncroLandingPage() {
         className="relative max-w-7xl mx-auto px-6 pt-12 pb-20"
       >
         <div className="grid lg:grid-cols-2 gap-16 items-center">
-          {/* LEFT */}
           <div>
             <div className="inline-flex items-center px-4 py-2 rounded-full border border-violet-500/30 bg-violet-500/10 text-violet-300 text-sm mb-6">
               AI EVENT ECOSYSTEM
@@ -300,7 +371,6 @@ export default function SyncroLandingPage() {
               </button>
             </div>
 
-            {/* STATS */}
             <div className="grid grid-cols-3 gap-6 mt-14">
               <div>
                 <h3 className="text-3xl font-bold text-violet-400">500+</h3>
@@ -317,10 +387,8 @@ export default function SyncroLandingPage() {
             </div>
           </div>
 
-          {/* RIGHT */}
           <div className="relative">
             <div className="absolute inset-0 blur-3xl bg-violet-600/20 rounded-full" />
-
             <div className="relative rounded-3xl border border-white/10 bg-white/5 backdrop-blur-xl p-6 shadow-2xl">
               <div className="flex items-center justify-between mb-6">
                 <div>
@@ -328,11 +396,11 @@ export default function SyncroLandingPage() {
                   <p className="text-gray-400 text-sm">AI Future Summit 2026</p>
                 </div>
                 <div className="px-3 py-1 rounded-full bg-red-500/20 text-red-400 text-xs">
-                  LIVE
+                  {" "}
+                  LIVE{" "}
                 </div>
               </div>
 
-              {/* CARDS */}
               <div className="grid grid-cols-2 gap-4 mb-6">
                 <div className="rounded-2xl bg-[#10172A] p-4 border border-white/5">
                   <p className="text-gray-400 text-sm">Total Peserta</p>
@@ -344,7 +412,6 @@ export default function SyncroLandingPage() {
                 </div>
               </div>
 
-              {/* LIVE SUBTITLE */}
               <div className="rounded-2xl bg-[#10172A] p-5 border border-white/5">
                 <div className="flex items-center justify-between mb-4">
                   <p className="font-semibold">Realtime Translation</p>
@@ -419,7 +486,6 @@ export default function SyncroLandingPage() {
           <h2 className="text-4xl font-bold">Pilih Paket Terbaik</h2>
         </div>
 
-        {/* PERBAIKAN: INTERKONEKSI KLIK PAKET KE DATABASE */}
         <div className="grid lg:grid-cols-3 gap-8">
           <PricingCard
             title="Starter"
@@ -462,11 +528,11 @@ export default function SyncroLandingPage() {
       <section id="download" className="max-w-7xl mx-auto px-6 py-24">
         <div className="rounded-[40px] border border-white/10 bg-gradient-to-br from-[#111827] to-[#0B1022] p-12">
           <div className="grid lg:grid-cols-2 gap-14 items-center">
-            {/* BAGIAN KIRI: Teks & Tombol */}
             <div>
               <p className="text-violet-400 font-semibold mb-3">MOBILE APP</p>
               <h2 className="text-5xl font-bold leading-tight text-white">
-                Akses Translate Event Dalam Genggaman
+                {" "}
+                Akses Translate Event Dalam Genggaman{" "}
               </h2>
               <p className="text-gray-400 mt-6 text-lg leading-relaxed">
                 Peserta dapat melihat subtitle realtime, mengirim pertanyaan,
@@ -477,17 +543,13 @@ export default function SyncroLandingPage() {
                 <button className="px-6 py-4 rounded-2xl bg-white text-black font-semibold flex items-center gap-2 hover:bg-gray-200 transition">
                   <Download size={18} /> Unduh
                 </button>
-
               </div>
             </div>
 
-            {/* BAGIAN KANAN: Gambar Local */}
             <div className="relative flex justify-center items-center">
-              {/* Efek cahaya di belakang gambar (Glow) */}
               <div className="absolute inset-0 bg-violet-500/20 blur-[100px] rounded-full"></div>
-
               <img
-                src="/images/promosi syncro.png" // Sesuaikan dengan nama file-mu di folder public
+                src="/images/promosi syncro.png"
                 alt="Mobile App Preview"
                 className="relative z-10 w-full max-w-md h-auto object-contain drop-shadow-2xl hover:-translate-y-4 hover:scale-105 transition-all duration-500 ease-out"
               />
@@ -502,7 +564,8 @@ export default function SyncroLandingPage() {
           <div>
             <p className="text-violet-400 font-semibold mb-3">CONTACT US</p>
             <h2 className="text-5xl font-bold leading-tight">
-              Hubungi Tim Syncro AI
+              {" "}
+              Hubungi Tim Syncro AI{" "}
             </h2>
             <p className="text-gray-400 mt-6 leading-relaxed">
               Punya pertanyaan tentang sistem, pricing, atau demo platform? Tim
@@ -524,7 +587,6 @@ export default function SyncroLandingPage() {
             </div>
           </div>
 
-          {/* BAGIAN KANAN: FORM */}
           <div className="rounded-3xl border border-white/10 bg-white/5 p-8">
             <form onSubmit={handleContactSubmit} className="space-y-5">
               <input
@@ -554,8 +616,8 @@ export default function SyncroLandingPage() {
                 placeholder="Tulis pesan Anda..."
                 className="w-full rounded-2xl bg-[#10172A] border border-white/5 px-5 py-4 outline-none resize-none focus:border-violet-500/50 transition-colors"
               />
-              <button 
-                type="submit" 
+              <button
+                type="submit"
                 disabled={isSubmitting}
                 className="w-full py-4 rounded-2xl bg-gradient-to-r from-violet-600 to-blue-500 font-semibold cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90 transition-opacity"
               >
@@ -574,7 +636,6 @@ export default function SyncroLandingPage() {
   );
 }
 
-/* ================= FEATURE CARD ================= */
 function FeatureCard({
   icon,
   title,
@@ -595,7 +656,6 @@ function FeatureCard({
   );
 }
 
-/* ================= PRICING CARD (INTEGRATED) ================= */
 function PricingCard({
   title,
   price,
@@ -618,12 +678,10 @@ function PricingCard({
           Most Popular
         </div>
       )}
-
       <h3 className="text-3xl font-bold">{title}</h3>
       <div className="mt-6">
         <span className="text-5xl font-black">{price}</span>
       </div>
-
       <div className="space-y-4 mt-8">
         {features.map((item, i) => (
           <div key={i} className="flex items-center gap-3 text-gray-300">
@@ -631,13 +689,13 @@ function PricingCard({
           </div>
         ))}
       </div>
-
       <button
         onClick={onSelect}
-        className={`w-full py-4 rounded-2xl mt-10 font-semibold cursor-pointer transition-all ${popular
+        className={`w-full py-4 rounded-2xl mt-10 font-semibold cursor-pointer transition-all ${
+          popular
             ? "bg-gradient-to-r from-violet-600 to-blue-500 text-white shadow-[0_0_20px_rgba(109,40,217,0.3)]"
             : "border border-white/10 hover:bg-white/5 text-white"
-          }`}
+        }`}
       >
         Pilih Paket
       </button>
@@ -645,7 +703,6 @@ function PricingCard({
   );
 }
 
-/* ================= CONTACT ITEM ================= */
 function ContactItem({ icon, text }: { icon: React.ReactNode; text: string }) {
   return (
     <div className="flex items-center gap-4">

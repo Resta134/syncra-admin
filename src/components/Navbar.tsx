@@ -12,9 +12,13 @@ interface Profile {
 
 export default function Navbar() {
   const [profile, setProfile] = useState<Profile | null>(null);
-
+  
   useEffect(() => {
     async function getProfile() {
+      if (!supabase) {
+        console.warn("⚠️ Supabase client belum siap di Navbar.");
+        return;
+      }
       // Pastikan Anda memfilter berdasarkan user yang sedang login agar tidak mengambil baris acak
       const { data: { user } } = await supabase.auth.getUser();
 

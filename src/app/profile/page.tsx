@@ -17,24 +17,33 @@ export default function ProfilePage() {
 
   useEffect(() => {
     async function fetchProfile() {
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-
-        if (user) {
-          const { data, error } = await supabase
-            .from('profiles')
-            .select('id, full_name, email, package_tier')
-            .eq('id', user.id)
-            .single();
-
-          if (data) setProfile(data);
-        }
-      } catch (error) {
-        console.error("Error fetching profile:", error);
-      } finally {
+    try {
+      // 1. Tambahkan benteng pengaman di sini
+      if (!supabase) {
+        console.warn("⚠️ Supabase client belum siap.");
         setLoading(false);
+        return;
       }
+
+      // 2. TypeScript sekarang dijamin aman dan tahu kalau 'supabase' tidak null
+      const { data: { user } } = await supabase.auth.getUser();
+
+      if (user) {
+        // Jangan lupa ganti juga di pemanggilan tabel profiles bawahnya agar seragam
+        const { data, error } = await supabase
+          .from("profiles")
+          .select("full_name, package_tier")
+          .eq("id", user.id)
+          .single();
+
+        // ... sisa kode penanganan data profile kamu ...
+      }
+    } catch (error) {
+      console.error("Error fetching profile:", error);
+    } finally {
+      setLoading(false);
     }
+  }
 
     fetchProfile();
   }, []);

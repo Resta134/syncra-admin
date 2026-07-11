@@ -4,7 +4,10 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
 if (!supabaseUrl || !supabaseAnonKey) {
-  console.error("❌ Supabase URL atau Anon Key tidak ditemukan di .env.local");
+  console.warn("⚠️ Peringatan: Supabase URL atau Anon Key tidak ditemukan.");
 }
 
-export const supabase = createClient(supabaseUrl!, supabaseAnonKey!);
+// Bikin client hanya jika env nya ada (biar gak crash pas build Vercel)
+export const supabase = (supabaseUrl && supabaseAnonKey)
+  ? createClient(supabaseUrl, supabaseAnonKey)
+  : null;

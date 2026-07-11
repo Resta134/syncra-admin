@@ -11,16 +11,14 @@ import {
   X,
   MapPin,
   Image as ImageIcon,
-  Infinity,
   Clock,
   Loader2,
   Ticket,
-  Mic, // <-- Tambahan icon Mic untuk pemateri
+  Mic, 
 } from "lucide-react";
 import { useState, useMemo, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 
-// --- 1. UPDATE INTERFACE (Tambahan Speaker) ---
 interface EventData {
   id: string;
   title: string;
@@ -32,9 +30,9 @@ interface EventData {
   price: number;
   image_url: string;
   description: string;
-  speaker_1: string; // Wajib
-  speaker_2?: string | null; // Opsional
-  speaker_3?: string | null; // Opsional
+  speaker_1: string; 
+  speaker_2?: string | null; 
+  speaker_3?: string | null; 
   participants?: number;
 }
 
@@ -46,7 +44,6 @@ export default function EventsPage() {
   const [editingEvent, setEditingEvent] = useState<EventData | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
 
-  // --- 2. UPDATE DEFAULT STATE (Tambahan Speaker) ---
   const [formData, setFormData] = useState<Partial<EventData>>({
     title: "",
     status: "Upcoming",
@@ -63,6 +60,13 @@ export default function EventsPage() {
   });
 
   const fetchEvents = async () => {
+    // Benteng Pengaman 1: Pastikan client Supabase terinisialisasi
+    if (!supabase) {
+      console.error("❌ Supabase client gagal diinisialisasi.");
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     const { data, error } = await supabase
       .from("events")
@@ -78,12 +82,18 @@ export default function EventsPage() {
   };
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchEvents();
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Benteng Pengaman 2: Pastikan client Supabase terinisialisasi
+    if (!supabase) {
+      alert("Proses Gagal: Koneksi ke database belum siap.");
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -91,7 +101,6 @@ export default function EventsPage() {
 
       if (imageFile) {
         const fileExt = imageFile.name.split(".").pop();
-        // eslint-disable-next-line react-hooks/purity
         const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
         const filePath = `${fileName}`;
 
@@ -110,7 +119,6 @@ export default function EventsPage() {
         finalImageUrl = urlData.publicUrl;
       }
 
-      // --- 3. UPDATE PAYLOAD UNTUK SUPABASE ---
       const payload = {
         title: formData.title,
         description: formData.description,
@@ -121,7 +129,6 @@ export default function EventsPage() {
         price: Number(formData.price),
         status: formData.status,
         image_url: finalImageUrl,
-        // Masukkan data speaker, jika string kosong ubah menjadi null
         speaker_1: formData.speaker_1,
         speaker_2: formData.speaker_2?.trim() === "" ? null : formData.speaker_2,
         speaker_3: formData.speaker_3?.trim() === "" ? null : formData.speaker_3,
@@ -146,7 +153,6 @@ export default function EventsPage() {
       setImageFile(null);
       fetchEvents();
       closeModal();
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
       console.error("Submit Error:", error);
       alert("Proses Gagal: " + error.message);
@@ -156,6 +162,12 @@ export default function EventsPage() {
   };
 
   const handleDelete = async (id: string) => {
+    // Benteng Pengaman 3: Pastikan client Supabase terinisialisasi
+    if (!supabase) {
+      alert("Gagal menghapus: Koneksi database belum siap.");
+      return;
+    }
+
     if (confirm("Hapus event ini?")) {
       const { error } = await supabase.from("events").delete().eq("id", id);
       if (error) alert(error.message);
@@ -174,7 +186,6 @@ export default function EventsPage() {
       setEditingEvent(event);
       setFormData({
         ...event,
-        // Pastikan null dari database dikonversi ke string kosong untuk input form
         speaker_2: event.speaker_2 || "",
         speaker_3: event.speaker_3 || "",
       });
@@ -264,12 +275,13 @@ export default function EventsPage() {
                   <div className="absolute inset-0 bg-gradient-to-t from-[#0a0a0a] to-transparent" />
                   <div className="absolute top-4 left-4">
                     <span
-                      className={`text-[9px] font-bold uppercase px-2 py-1 rounded border ${event.status === "Ongoing"
+                      className={`text-[9px] font-bold uppercase px-2 py-1 rounded border ${
+                        event.status === "Ongoing"
                           ? "border-emerald-500 text-emerald-400 bg-emerald-400/10"
                           : event.status === "Upcoming"
                             ? "border-cyan-500 text-cyan-400 bg-cyan-400/10"
                             : "border-gray-500 text-gray-400 bg-gray-500/10"
-                        }`}
+                      }`}
                     >
                       {event.status}
                     </span>
@@ -305,7 +317,6 @@ export default function EventsPage() {
                       <MapPin size={14} className="text-cyan-500 shrink-0" />{" "}
                       <span className="truncate">{event.location}</span>
                     </div>
-                    {/* INDIKATOR PEMATERI DI KARTU (Opsional, tapi bagus untuk UX) */}
                     <div className="flex items-center gap-2">
                       <Mic size={14} className="text-cyan-500 shrink-0" />{" "}
                       <span className="truncate text-white">
@@ -322,10 +333,11 @@ export default function EventsPage() {
                     <div className="flex items-center gap-2">
                       <Ticket
                         size={14}
-                        className={`shrink-0 ${event.price === 0 || !event.price
+                        className={`shrink-0 ${
+                          event.price === 0 || !event.price
                             ? "text-emerald-500"
                             : "text-yellow-500"
-                          }`}
+                        }`}
                       />
                       Harga:{" "}
                       <span
@@ -338,10 +350,10 @@ export default function EventsPage() {
                         {event.price === 0 || !event.price
                           ? "GRATIS"
                           : new Intl.NumberFormat("id-ID", {
-                            style: "currency",
-                            currency: "IDR",
-                            minimumFractionDigits: 0,
-                          }).format(event.price)}
+                              style: "currency",
+                              currency: "IDR",
+                              minimumFractionDigits: 0,
+                            }).format(event.price)}
                       </span>
                     </div>
                   </div>
@@ -397,7 +409,6 @@ export default function EventsPage() {
                 />
               </div>
 
-              {/* --- 4. FORM INPUT PEMATERI (1 Wajib, 2 Opsional) --- */}
               <div className="space-y-4 bg-white/[0.02] border border-white/5 p-5 rounded-2xl">
                 <label className="flex items-center gap-2 text-[10px] text-cyan-500 font-black uppercase tracking-[0.2em]">
                   <Mic size={14} /> Daftar Pemateri
@@ -512,10 +523,11 @@ export default function EventsPage() {
                         quota: formData.quota === "Unlimited" ? 0 : "Unlimited",
                       })
                     }
-                    className={`px-3 rounded-xl border text-[8px] font-black transition-all ${formData.quota === "Unlimited"
+                    className={`px-3 rounded-xl border text-[8px] font-black transition-all ${
+                      formData.quota === "Unlimited"
                         ? "bg-cyan-500 text-black border-cyan-500 shadow-[0_0_15px_rgba(6,182,212,0.4)]"
                         : "border-white/10 text-gray-500"
-                      }`}
+                    }`}
                   >
                     UNLIMITED
                   </button>
@@ -555,7 +567,6 @@ export default function EventsPage() {
                   onChange={(e) =>
                     setFormData({
                       ...formData,
-                      // eslint-disable-next-line @typescript-eslint/no-explicit-any
                       status: e.target.value as any,
                     })
                   }
@@ -579,6 +590,7 @@ export default function EventsPage() {
                         className="w-full h-full object-cover rounded-lg"
                       />
                       <button
+                        type="button"
                         onClick={() =>
                           setFormData({ ...formData, image_url: "" })
                         }
