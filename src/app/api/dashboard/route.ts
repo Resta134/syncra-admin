@@ -3,11 +3,18 @@ import { NextRequest, NextResponse } from "next/server";
 import client from "@/lib/mongodb";
 
 export async function GET(request: NextRequest) {
+  // 1. VAKSIN VERCEL: Beri nama database dummy jika env kosong saat build time
+  const dbName = process.env.MONGODB_DB || "dummy_db";
+
+  // 2. CEGAT EKSEKUSI: Agar tidak melakukan query beneran saat Vercel sedang nge-build
+  if (dbName === "dummy_db") {
+    return NextResponse.json({ message: "Build time bypass" }, { status: 200 });
+  }
+
   try {
-
-    const db = client.db(process.env.MONGODB_DB);
+    // 3. Masukkan dbName yang sudah aman ke client
+    const db = client.db(dbName);
     const collection = db.collection("data_youtube_events_clean");
-
     // ===========================
     // QUERY PARAMETER
     // ===========================
