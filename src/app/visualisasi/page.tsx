@@ -110,6 +110,8 @@ export default function Home() {
             const res = await fetch(url);
             const data = await res.json();
 
+            console.log(data);
+
             setSummary(data.summary);
             setPieData(data.visualization.pie);
             setBarData([]);
@@ -197,7 +199,7 @@ export default function Home() {
         { label: "Average Latency", val: kpiStats.latencies, icon: Languages },
     ];
 
-    
+
 
     // ================= TAMPILAN DASHBOARD ASLI (JIKA LOLOS LOGIN) =================
     return (
@@ -343,12 +345,9 @@ export default function Home() {
                     <div className="h-[600px]">
                         {
                             selectedCategory == null ?
-
                                 (
-
                                     <ResponsiveContainer width="100%" height="100%">
                                         <PieChart>
-
                                             <Pie
                                                 data={pieData}
                                                 dataKey="totalViews"
@@ -465,7 +464,7 @@ export default function Home() {
 
                                                             <p className="text-cyan-400 text-sm">
                                                                 Channel :
-                                                                <br />
+                                                               
                                                                 {data.channel}
                                                             </p>
 

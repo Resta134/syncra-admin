@@ -14,7 +14,10 @@ import {
   Clock,
   Loader2,
   Ticket,
-  Mic, 
+  Mic,
+  CheckCircle2, // <-- Tambahan icon untuk testing pop-up
+  AlertCircle,  // <-- Tambahan icon untuk testing pop-up
+  HelpCircle,   // <-- Tambahan icon untuk testing pop-up
 } from "lucide-react";
 import { useState, useMemo, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
@@ -30,9 +33,9 @@ interface EventData {
   price: number;
   image_url: string;
   description: string;
-  speaker_1: string; 
-  speaker_2?: string | null; 
-  speaker_3?: string | null; 
+  speaker_1: string;
+  speaker_2?: string | null;
+  speaker_3?: string | null;
   participants?: number;
 }
 
@@ -43,6 +46,27 @@ export default function EventsPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<EventData | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
+
+  // --- 1. STATE BARU: POP-UP TESTING KATALON ---
+  const [statusPopup, setStatusPopup] = useState<{
+    show: boolean;
+    type: "success" | "error";
+    message: string;
+  }>({ show: false, type: "success", message: "" });
+
+  const [deleteConfirm, setDeleteConfirm] = useState<{
+    show: boolean;
+    idToDelete: string | null;
+  }>({ show: false, idToDelete: null });
+
+  // Fungsi helper untuk menampilkan pop-up
+  const showPopup = (type: "success" | "error", message: string) => {
+    setStatusPopup({ show: true, type, message });
+    // Otomatis hilang setelah 4 detik
+    setTimeout(() => {
+      setStatusPopup((prev) => ({ ...prev, show: false }));
+    }, 4000);
+  };
 
   const [formData, setFormData] = useState<Partial<EventData>>({
     title: "",
@@ -75,6 +99,7 @@ export default function EventsPage() {
 
     if (error) {
       console.error("Error:", error.message);
+      showPopup("error", "Gagal mengambil data dari database!");
     } else {
       setEvents(data || []);
     }
@@ -90,7 +115,7 @@ export default function EventsPage() {
 
     // Benteng Pengaman 2: Pastikan client Supabase terinisialisasi
     if (!supabase) {
-      alert("Proses Gagal: Koneksi ke database belum siap.");
+      showPopup("error", "Proses Gagal: Koneksi ke database belum siap.");
       return;
     }
 
@@ -149,30 +174,44 @@ export default function EventsPage() {
         if (insertError) throw insertError;
       }
 
-      alert("System Synchronized Successfully!");
+      // 2. GANTI ALERT SUKSES DENGAN POP-UP
+      showPopup("success", "System Synchronized Successfully!");
       setImageFile(null);
       fetchEvents();
       closeModal();
     } catch (error: any) {
       console.error("Submit Error:", error);
-      alert("Proses Gagal: " + error.message);
+      // 3. GANTI ALERT ERROR DENGAN POP-UP
+      showPopup("error", "Proses Gagal: " + error.message);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleDelete = async (id: string) => {
-    // Benteng Pengaman 3: Pastikan client Supabase terinisialisasi
+  // 4. MODIFIKASI ALUR DELETE AGAR MENGGUNAKAN POP-UP MODAL (Gabungan dengan pengaman Supabase)
+  const confirmDeleteClick = (id: string) => {
     if (!supabase) {
-      alert("Gagal menghapus: Koneksi database belum siap.");
+      showPopup("error", "Gagal menghapus: Koneksi database belum siap.");
       return;
     }
+    setDeleteConfirm({ show: true, idToDelete: id });
+  };
 
-    if (confirm("Hapus event ini?")) {
-      const { error } = await supabase.from("events").delete().eq("id", id);
-      if (error) alert(error.message);
-      else fetchEvents();
+  const executeDelete = async () => {
+    if (!deleteConfirm.idToDelete) return;
+
+    const { error } = await supabase
+      .from("events")
+      .delete()
+      .eq("id", deleteConfirm.idToDelete);
+
+    if (error) {
+      showPopup("error", error.message);
+    } else {
+      showPopup("success", "Event berhasil dihapus dari sistem!");
+      fetchEvents();
     }
+    setDeleteConfirm({ show: false, idToDelete: null });
   };
 
   const filteredEvents = useMemo(() => {
@@ -217,6 +256,83 @@ export default function EventsPage() {
   return (
     <>
       <Navbar />
+      {statusPopup.show && (
+        <div
+          data-testid="status-popup"
+          id="katalon-status-popup"
+          className={`fixed top-6 left-1/2 -translate-x-1/2 z-[100] p-4 rounded-2xl border flex items-center gap-3 shadow-[0_10px_40px_rgba(0,0,0,0.8)] backdrop-blur-md animate-in fade-in slide-in-from-top-5 duration-300 min-w-[320px] max-w-md ${
+            statusPopup.type === "success"
+              ? "bg-[#0a0a0a]/95 border-emerald-500/50 text-emerald-400"
+              : "bg-[#0a0a0a]/95 border-red-500/50 text-red-400"
+          }`}
+        >
+          {statusPopup.type === "success" ? (
+            <CheckCircle2 className="text-emerald-500 shrink-0" size={20} />
+          ) : (
+            <AlertCircle className="text-red-500 shrink-0" size={20} />
+          )}
+          <div className="text-xs font-bold tracking-wide flex-1">
+            <span className="uppercase text-[9px] block text-gray-400 font-black tracking-widest">
+              System Notification
+            </span>
+            <span
+              data-testid="status-popup-message"
+              className="text-white mt-0.5 block font-medium"
+            >
+              {statusPopup.message}
+            </span>
+          </div>
+          <button
+            onClick={() => setStatusPopup((prev) => ({ ...prev, show: false }))}
+            className="ml-2 text-gray-500 hover:text-white cursor-pointer p-1 rounded-lg hover:bg-white/5 transition-colors"
+            data-testid="close-status-popup"
+          >
+            <X size={16} />
+          </button>
+        </div>
+      )}
+
+      {deleteConfirm.show && (
+        // Hapus backdrop-blur, pakai bg-black/60 biasa
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div
+            data-testid="delete-confirm-modal"
+            id="katalon-delete-confirm-modal"
+            // Hapus glass-card, ganti warna ke dark slate biasa (#18181b), border tipis standar
+            className="w-full max-w-sm p-6 bg-[#18181b] border border-gray-700 rounded-lg text-left space-y-4 shadow-lg"
+          >
+            <div>
+              <h4 className="text-white font-semibold text-base">
+                Konfirmasi Hapus Event
+              </h4>
+              <p className="text-gray-300 text-sm mt-2 leading-relaxed">
+                Apakah Anda yakin ingin menghapus data event ini? Data yang
+                dihapus tidak dapat dikembalikan.
+              </p>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                onClick={() =>
+                  setDeleteConfirm({ show: false, idToDelete: null })
+                }
+                data-testid="btn-cancel-delete"
+                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-gray-200 rounded text-sm font-medium transition-colors cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                onClick={executeDelete}
+                data-testid="btn-confirm-delete"
+                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded text-sm font-medium transition-colors cursor-pointer"
+              >
+                Hapus Data
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="space-y-8">
         <div className="flex justify-between items-end">
           <div>
@@ -229,6 +345,7 @@ export default function EventsPage() {
           </div>
           <button
             onClick={() => openModal()}
+            data-testid="btn-create-event"
             className="flex items-center gap-2 bg-cyan-500 hover:bg-cyan-400 text-black px-6 py-3 rounded-xl font-bold transition-all shadow-[0_0_15px_rgba(6,182,212,0.4)] cursor-pointer"
           >
             <Plus size={20} /> Create Event
@@ -242,6 +359,7 @@ export default function EventsPage() {
           />
           <input
             type="text"
+            data-testid="input-search-event"
             placeholder="Filter by event name..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -258,9 +376,10 @@ export default function EventsPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredEvents.map((event) => (
+            {filteredEvents.map((event, index) => (
               <div
                 key={event.id}
+                data-testid={`event-card-${index}`}
                 className="glass-card overflow-hidden group hover:border-cyan-500/30 transition-all bg-[#0a0a0a] border border-white/5 rounded-2xl"
               >
                 <div className="h-44 relative">
@@ -289,12 +408,14 @@ export default function EventsPage() {
                   <div className="absolute top-4 right-4 flex gap-1">
                     <button
                       onClick={() => openModal(event)}
+                      data-testid={`btn-edit-event-${index}`}
                       className="p-2 bg-black/60 hover:bg-cyan-500 hover:text-black rounded-lg text-gray-400 transition-all cursor-pointer"
                     >
                       <Edit3 size={14} />
                     </button>
                     <button
-                      onClick={() => handleDelete(event.id)}
+                      onClick={() => confirmDeleteClick(event.id)}
+                      data-testid={`btn-delete-event-${index}`}
                       className="p-2 bg-black/60 hover:bg-red-500 hover:text-white rounded-lg text-gray-400 transition-all cursor-pointer"
                     >
                       <Trash2 size={14} />
@@ -320,7 +441,7 @@ export default function EventsPage() {
                     <div className="flex items-center gap-2">
                       <Mic size={14} className="text-cyan-500 shrink-0" />{" "}
                       <span className="truncate text-white">
-                        {event.speaker_1} {event.speaker_2 ? `& lainnya` : ''}
+                        {event.speaker_1} {event.speaker_2 ? `& lainnya` : ""}
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
@@ -366,9 +487,13 @@ export default function EventsPage() {
 
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-md p-4">
-          <div className="glass-card w-full max-w-2xl p-8 border-cyan-500/20 relative max-h-[90vh] overflow-y-auto custom-scrollbar bg-[#0a0a0a]">
+          <div
+            data-testid="event-form-modal"
+            className="glass-card w-full max-w-2xl p-8 border-cyan-500/20 relative max-h-[90vh] overflow-y-auto custom-scrollbar bg-[#0a0a0a]"
+          >
             <button
               onClick={closeModal}
+              data-testid="btn-close-modal"
               className="absolute top-6 right-6 text-gray-500 hover:text-white cursor-pointer z-10"
             >
               <X size={20} />
@@ -385,6 +510,7 @@ export default function EventsPage() {
                 </label>
                 <input
                   required
+                  data-testid="input-event-title"
                   value={formData.title}
                   onChange={(e) =>
                     setFormData({ ...formData, title: e.target.value })
@@ -400,6 +526,7 @@ export default function EventsPage() {
                 </label>
                 <textarea
                   rows={3}
+                  data-testid="input-event-description"
                   value={formData.description}
                   onChange={(e) =>
                     setFormData({ ...formData, description: e.target.value })
@@ -415,29 +542,44 @@ export default function EventsPage() {
                 </label>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-1">
-                    <label className="text-[9px] text-gray-500 uppercase font-bold">Pemateri 1 (Wajib)</label>
+                    <label className="text-[9px] text-gray-500 uppercase font-bold">
+                      Pemateri 1 (Wajib)
+                    </label>
                     <input
                       required
+                      data-testid="input-speaker-1"
                       value={formData.speaker_1}
-                      onChange={(e) => setFormData({ ...formData, speaker_1: e.target.value })}
+                      onChange={(e) =>
+                        setFormData({ ...formData, speaker_1: e.target.value })
+                      }
                       className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-sm text-white outline-none focus:border-cyan-500 transition-all"
                       placeholder="Nama Lengkap"
                     />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[9px] text-gray-500 uppercase font-bold">Pemateri 2 (Opsional)</label>
+                    <label className="text-[9px] text-gray-500 uppercase font-bold">
+                      Pemateri 2 (Opsional)
+                    </label>
                     <input
+                      data-testid="input-speaker-2"
                       value={formData.speaker_2 || ""}
-                      onChange={(e) => setFormData({ ...formData, speaker_2: e.target.value })}
+                      onChange={(e) =>
+                        setFormData({ ...formData, speaker_2: e.target.value })
+                      }
                       className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-sm text-white outline-none focus:border-cyan-500 transition-all"
                       placeholder="Nama Lengkap"
                     />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[9px] text-gray-500 uppercase font-bold">Pemateri 3 (Opsional)</label>
+                    <label className="text-[9px] text-gray-500 uppercase font-bold">
+                      Pemateri 3 (Opsional)
+                    </label>
                     <input
+                      data-testid="input-speaker-3"
                       value={formData.speaker_3 || ""}
-                      onChange={(e) => setFormData({ ...formData, speaker_3: e.target.value })}
+                      onChange={(e) =>
+                        setFormData({ ...formData, speaker_3: e.target.value })
+                      }
                       className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-sm text-white outline-none focus:border-cyan-500 transition-all"
                       placeholder="Nama Lengkap"
                     />
@@ -453,6 +595,7 @@ export default function EventsPage() {
                   <input
                     type="date"
                     required
+                    data-testid="input-event-date"
                     value={formData.event_date}
                     onChange={(e) =>
                       setFormData({ ...formData, event_date: e.target.value })
@@ -467,6 +610,7 @@ export default function EventsPage() {
                   <input
                     type="time"
                     required
+                    data-testid="input-event-time"
                     value={formData.event_time}
                     onChange={(e) =>
                       setFormData({ ...formData, event_time: e.target.value })
@@ -487,6 +631,7 @@ export default function EventsPage() {
                   />
                   <input
                     required
+                    data-testid="input-event-location"
                     value={formData.location}
                     onChange={(e) =>
                       setFormData({ ...formData, location: e.target.value })
@@ -505,6 +650,7 @@ export default function EventsPage() {
                   <input
                     disabled={formData.quota === "Unlimited"}
                     type="number"
+                    data-testid="input-event-quota"
                     value={formData.quota === "Unlimited" ? "" : formData.quota}
                     onChange={(e) =>
                       setFormData({
@@ -517,10 +663,12 @@ export default function EventsPage() {
                   />
                   <button
                     type="button"
+                    data-testid="btn-quota-unlimited"
                     onClick={() =>
                       setFormData({
                         ...formData,
-                        quota: formData.quota === "Unlimited" ? 0 : "Unlimited",
+                        quota:
+                          formData.quota === "Unlimited" ? 0 : "Unlimited",
                       })
                     }
                     className={`px-3 rounded-xl border text-[8px] font-black transition-all ${
@@ -545,6 +693,7 @@ export default function EventsPage() {
                   <input
                     type="number"
                     min="0"
+                    data-testid="input-event-price"
                     value={formData.price === 0 ? "" : formData.price}
                     onChange={(e) =>
                       setFormData({
@@ -563,6 +712,7 @@ export default function EventsPage() {
                   Status Event
                 </label>
                 <select
+                  data-testid="select-event-status"
                   value={formData.status}
                   onChange={(e) =>
                     setFormData({
@@ -609,6 +759,7 @@ export default function EventsPage() {
                   )}
                   <input
                     type="file"
+                    data-testid="input-event-image"
                     accept="image/*"
                     className="absolute inset-0 opacity-0 cursor-pointer"
                     onChange={(e) => {
@@ -627,6 +778,7 @@ export default function EventsPage() {
 
               <button
                 type="submit"
+                data-testid="btn-submit-event"
                 className="w-full bg-cyan-500 hover:bg-cyan-400 text-black font-black py-5 rounded-2xl mt-4 shadow-[0_0_30px_rgba(6,182,212,0.3)] transition-all uppercase tracking-[0.3em] text-xs cursor-pointer"
               >
                 {editingEvent ? "Confirm Update System" : "Deploy To System"}

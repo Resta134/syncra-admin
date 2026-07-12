@@ -22,7 +22,7 @@ const menuItems = [
   { icon: ShieldCheck, label: "Roles & Users", href: "/roles" }, // Menu Baru
   // { icon: Zap, label: "Face AI", href: "/face-ai" },
   // { icon: Languages, label: "AI Translation", href: "/translation" },
-  { icon: Settings, label: "Settings", href: "/settings" },
+  // { icon: Settings, label: "Settings", href: "/settings" },
 ];
 
 export default function Sidebar() {
